@@ -341,7 +341,7 @@ function render(){
 const later=[];
 const LBL={waktu_sekarang:'Mengecek waktu',info_perangkat:'Mengecek perangkat',lokasi_saya:'Mencari lokasi',buka_url:'Menyiapkan tautan',
   buka_aplikasi:'Menyiapkan aplikasi',cari_web:'Mencari di web',buat_pengingat:'Membuat pengingat',ingat:'Menyimpan ingatan',lupakan:'Menghapus ingatan',
-  salin_teks:'Menyalin teks',baca_clipboard:'Membaca clipboard',bagikan:'Membuka menu bagikan',hitung:'Menghitung'};
+  salin_teks:'Menyalin teks',baca_clipboard:'Membaca clipboard',bagikan:'Membuka menu bagikan',hitung:'Menghitung',senter:'Mengatur senter',atur_volume:'Mengatur volume'};
 const nowStr=()=>new Date().toLocaleString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
 const T={
   async waktu_sekarang(){return nowStr()},
@@ -365,6 +365,14 @@ const T={
   async lupakan(a){const k=String(a.kata_kunci).toLowerCase(),n=D.mem.length;D.mem=D.mem.filter(m=>!m.toLowerCase().includes(k));save();renderMem();return `${n-D.mem.length} ingatan dihapus.`},
   async salin_teks(a){await CB.write({string:a.teks});return 'Tersalin.'},
   async baca_clipboard(){const r=await CB.read();return r.value||'(kosong)'},
+  async senter(a){if(!KA)throw new Error('hanya di aplikasi Android');
+    const m=['on','off','toggle'].includes(a.mode)?a.mode:'toggle';
+    const r=await KA.torch({mode:m});return r.on?'Senter menyala.':'Senter mati.'},
+  async atur_volume(a){if(!KA)throw new Error('hanya di aplikasi Android');
+    const J=['media','dering','alarm','notifikasi','panggilan'],o={jenis:J.includes(a.jenis)?a.jenis:'media'};
+    if(a.persen!=null&&a.persen!==''&&!isNaN(+a.persen))o.persen=Math.max(0,Math.min(100,Math.round(+a.persen)));
+    else if(a.ubah!=null&&a.ubah!==''&&!isNaN(+a.ubah))o.ubah=Math.max(-100,Math.min(100,Math.round(+a.ubah)));
+    const r=await KA.volume(o);return 'Volume '+o.jenis+' sekarang '+r.persen+'%.'},
   async bagikan(a){await SH.share({title:a.judul||'Jarvis',text:a.teks,dialogTitle:'Bagikan'});return 'Menu bagikan dibuka.'},
   async cari_web(a){
     const r=await gcall({systemInstruction:{parts:[{text:'Jawab ringkas dalam bahasa Indonesia berdasarkan hasil pencarian web terbaru.'}]},
@@ -395,7 +403,9 @@ function defs(){
     {name:'salin_teks',description:'Menyalin teks ke clipboard.',input_schema:o({teks:s('Teks')},['teks'])},
     {name:'baca_clipboard',description:'Membaca isi clipboard.',input_schema:o({})},
     {name:'bagikan',description:'Membuka menu bagikan Android dengan teks tertentu.',input_schema:o({teks:s('Teks'),judul:s('Judul')},['teks'])},
-    {name:'hitung',description:'Menghitung ekspresi matematika, contoh: (12+8)*3/4.',input_schema:o({ekspresi:s('Ekspresi')},['ekspresi'])}
+    {name:'hitung',description:'Menghitung ekspresi matematika, contoh: (12+8)*3/4.',input_schema:o({ekspresi:s('Ekspresi')},['ekspresi'])},
+    {name:'senter',description:'Menyalakan, mematikan, atau membalik senter (flash) HP.',input_schema:o({mode:{type:'string',enum:['on','off','toggle'],description:'on = nyalakan, off = matikan, toggle = balik keadaan sekarang'}},['mode'])},
+    {name:'atur_volume',description:'Mengatur volume HP. Isi persen (0 sampai 100) untuk level pasti, ATAU ubah (angka positif untuk menaikkan, negatif untuk menurunkan, dalam persen). Jenis bawaan: media.',input_schema:o({jenis:{type:'string',enum:['media','dering','alarm','notifikasi','panggilan'],description:'Jenis volume, bawaan media'},persen:{type:'number',description:'Level volume 0 sampai 100'},ubah:{type:'number',description:'Perubahan volume dalam persen, mis. 10 atau -10'}})}
   ];
   return t;
 }
@@ -692,10 +702,10 @@ A.rules.forEach(r=>{if(!r.acts){r.acts=[r.act||{type:'notif',val:''}];delete r.a
 A.apps=Array.isArray(A.apps)?A.apps:[];A.inst=Array.isArray(A.inst)?A.inst:[];
 const saveA=()=>{try{localStorage.setItem(AK,JSON.stringify(A))}catch(e){}};
 const DN=['','Min','Sen','Sel','Rab','Kam','Jum','Sab'],ALL=[1,2,3,4,5,6,7];
-const ACT={notif:'Munculkan notifikasi',ucap:'Ucapkan dengan suara',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim ke webhook',tunggu:'Tunggu beberapa detik'};
-const ACS={notif:'Notifikasi',ucap:'Ucapkan',app:'Buka app',url:'Buka tautan',salin:'Salin',bagi:'Bagikan',http:'Webhook',tunggu:'Tunggu'};
-const IC={clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',bat:'<rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v3"/>',plug:'<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',unplug:'<path d="M13 3L5 13h6l-1 8 8-10h-6zM4 4l16 16"/>',tap:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',pin:'<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',bell:'<path d="M6 16v-5a6 6 0 1112 0v5l2 2H4zM10 21h4"/>',speak:'<path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6"/>',app:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',share:'<path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',wait:'<path d="M7 3h10M7 21h10M8 3c0 6 8 6 8 18M16 3c0 6-8 6-8 18"/>',filter:'<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>',chev:'<path d="M7 10l5 5 5-5"/>',check:'<path d="M5 12l5 5 9-10"/>',eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',eyeoff:'<path d="M3 3l18 18M10.6 6.2A9.7 9.7 0 0112 6c6 0 10 6 10 6a17 17 0 01-3.2 3.7M6.6 6.7A17 17 0 002 12s4 7 10 7a9.7 9.7 0 004-.9"/>'};
-const TI={waktu:'clock',sekali:'cal',baterai:'bat',colok:'plug',cabut:'unplug',manual:'tap',suara:'speak',masuk:'pin',keluar:'pin'},AI2={notif:'bell',ucap:'speak',app:'app',url:'link',salin:'copy',bagi:'share',http:'globe',tunggu:'wait'};
+const ACT={notif:'Munculkan notifikasi',ucap:'Ucapkan dengan suara',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim ke webhook',tunggu:'Tunggu beberapa detik',senter:'Atur senter',volume:'Atur volume'};
+const ACS={notif:'Notifikasi',ucap:'Ucapkan',app:'Buka app',url:'Buka tautan',salin:'Salin',bagi:'Bagikan',http:'Webhook',tunggu:'Tunggu',senter:'Senter',volume:'Volume'};
+const IC={torch:'<path d="M8 3h8v5l-2 3v10h-4V11L8 8z"/>',vol:'<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9c1.5 1.5 1.5 4.5 0 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',bat:'<rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v3"/>',plug:'<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',unplug:'<path d="M13 3L5 13h6l-1 8 8-10h-6zM4 4l16 16"/>',tap:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',pin:'<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',bell:'<path d="M6 16v-5a6 6 0 1112 0v5l2 2H4zM10 21h4"/>',speak:'<path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6"/>',app:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',share:'<path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',wait:'<path d="M7 3h10M7 21h10M8 3c0 6 8 6 8 18M16 3c0 6-8 6-8 18"/>',filter:'<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>',chev:'<path d="M7 10l5 5 5-5"/>',check:'<path d="M5 12l5 5 9-10"/>',eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',eyeoff:'<path d="M3 3l18 18M10.6 6.2A9.7 9.7 0 0112 6c6 0 10 6 10 6a17 17 0 01-3.2 3.7M6.6 6.7A17 17 0 002 12s4 7 10 7a9.7 9.7 0 004-.9"/>'};
+const TI={waktu:'clock',sekali:'cal',baterai:'bat',colok:'plug',cabut:'unplug',manual:'tap',suara:'speak',masuk:'pin',keluar:'pin'},AI2={notif:'bell',ucap:'speak',app:'app',url:'link',salin:'copy',bagi:'share',http:'globe',tunggu:'wait',senter:'torch',volume:'vol'};
 const CL={bl:'Baterai di bawah',bg:'Baterai di atas',ch:'Sedang dicas',nc:'Tidak sedang dicas'};
 const cdesc=c=>CL[c.type]+(c.val?' '+c.val+'%':'');
 const SV=k=>'<svg class="ic" viewBox="0 0 24 24">'+IC[k]+'</svg>';
@@ -708,7 +718,7 @@ function flow(r){const w=document.createElement('div');w.className='flow';
   r.acts.forEach((a,i)=>{const v=a.type==='app'?((A.apps.concat(A.inst,CAT).find(x=>x.v===a.val)||{}).n||a.val):a.val;
     P.push(['m',i?'Lalu':'Maka',AI2[a.type],ACS[a.type]+(a.type==='tunggu'?' '+v+' dtk':v?': '+tr(v,16):'')])});
   P.forEach((p,i)=>{if(i){const m=document.createElement('em');m.textContent='›';w.appendChild(m)}w.appendChild(fs(...p))});return w}
-const PH={notif:'Isi pesan',ucap:'Kalimat yang diucapkan',app:'Nama paket, mis. com.whatsapp',url:'https://, tel:, sms:, geo:',salin:'Teks yang disalin',bagi:'Teks yang dibagikan',http:'https://… alamat webhook',tunggu:'Berapa detik'};
+const PH={notif:'Isi pesan',ucap:'Kalimat yang diucapkan',app:'Nama paket, mis. com.whatsapp',url:'https://, tel:, sms:, geo:',salin:'Teks yang disalin',bagi:'Teks yang dibagikan',http:'https://… alamat webhook',tunggu:'Berapa detik',senter:'on, off, atau toggle (kosong = on)',volume:'Persen 0-100, atau +10 / -10'};
 const fmt=d=>new Date(d).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 let tt=0,trigT='waktu',days=ALL.slice(),ed=0,AC2=[],lastChg=null;const hit={},lf={};
 function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2800)}
@@ -771,6 +781,9 @@ async function step(a,r){
   else if(a.type==='salin'){await cbw(v);toast('Tersalin.')}
   else if(a.type==='bagi'){if(!SH)throw new Error('hanya di aplikasi Android');await SH.share({title:r.name,text:v,dialogTitle:'Bagikan'})}
   else if(a.type==='http'){const res=await fetch(v,a.val2?{method:'POST',headers:{'content-type':'application/json'},body:a.val2}:{});if(!res.ok)throw new Error('HTTP '+res.status)}
+  else if(a.type==='senter'){const m=v.trim().toLowerCase();await T.senter({mode:['on','off','toggle'].includes(m)?m:'on'})}
+  else if(a.type==='volume'){const t=v.trim(),o={jenis:String(a.val2||'media').trim().toLowerCase()};
+    if(/^[+-]/.test(t))o.ubah=+t;else o.persen=+t;await T.atur_volume(o)}
   else if(a.type==='tunggu')await sleep(Math.min(300,Math.max(0,+v||0))*1000);
   else{if(!AL)throw new Error('hanya jalan di aplikasi Android');await AL.openUrl({url:v})}
 }
@@ -888,7 +901,7 @@ function drawActs(){
     if(a.type==='app'){const r=document.createElement('div');r.className='row';const lb=document.createElement('span');lb.textContent='Aplikasi';
       const b=document.createElement('button');b.type='button';b.className='dd';const tx=document.createElement('span');tx.textContent=a.val?appName(a.val):'Pilih aplikasi';b.append(tx);b.insertAdjacentHTML('beforeend',SV('chev'));
       b.onclick=()=>apPick(o=>{a.val=o.v;drawActs()});r.append(lb,b);g.appendChild(r)}
-    else{inp('val',PH[a.type]);if(a.type==='http')inp('val2','Isi JSON (kosong = GET)')}
+    else{inp('val',PH[a.type]);if(a.type==='http')inp('val2','Isi JSON (kosong = GET)');if(a.type==='volume')inp('val2','Jenis: media, dering, alarm, notifikasi (kosong = media)')}
     w.appendChild(g)});
 }
 function openA(id,pre){
@@ -933,7 +946,7 @@ const TPL=[
 TPL.forEach(([l,x])=>{const b=document.createElement('button');b.className='chip glass';b.textContent=l;b.onclick=()=>openA(0,x);$('#aTpl').appendChild(b)});
 
 async function ai(text){
-  const P='Ubah permintaan pengguna menjadi satu aturan otomatisasi HP. Balas HANYA JSON tanpa markdown: {"name":"nama singkat","trig":T,"acts":[aksi berurutan]}. T salah satu: {"type":"waktu","time":"HH:MM","days":[1-7, 1=Minggu, setiap hari=1,2,3,4,5,6,7]}, {"type":"sekali","at":"YYYY-MM-DDTHH:mm waktu lokal"}, {"type":"baterai","val":persen di bawah}, {"type":"colok"}, {"type":"cabut"}, {"type":"manual"}, {"type":"suara","kata":"kata yang diucapkan pengguna"}. Boleh tambah "cond":{"type":"bl|bg|ch|nc","val":persen} (bl baterai di bawah, bg di atas, ch sedang dicas, nc tidak dicas). Aksi: {"type":"notif|ucap|app|url|salin|bagi|http|tunggu","val":"pesan, kalimat, nama paket Android, tautan, teks, alamat webhook, atau jumlah detik","val2":"isi JSON untuk http, opsional"}. Sekarang: '+nowStr();
+  const P='Ubah permintaan pengguna menjadi satu aturan otomatisasi HP. Balas HANYA JSON tanpa markdown: {"name":"nama singkat","trig":T,"acts":[aksi berurutan]}. T salah satu: {"type":"waktu","time":"HH:MM","days":[1-7, 1=Minggu, setiap hari=1,2,3,4,5,6,7]}, {"type":"sekali","at":"YYYY-MM-DDTHH:mm waktu lokal"}, {"type":"baterai","val":persen di bawah}, {"type":"colok"}, {"type":"cabut"}, {"type":"manual"}, {"type":"suara","kata":"kata yang diucapkan pengguna"}. Boleh tambah "cond":{"type":"bl|bg|ch|nc","val":persen} (bl baterai di bawah, bg di atas, ch sedang dicas, nc tidak dicas). Aksi: {"type":"notif|ucap|app|url|salin|bagi|http|tunggu|senter|volume","val":"pesan, kalimat, nama paket Android, tautan, teks, alamat webhook, jumlah detik, untuk senter: on/off/toggle, untuk volume: persen 0-100 atau +N/-N","val2":"isi JSON untuk http, atau jenis volume media/dering/alarm/notifikasi, opsional"}. Sekarang: '+nowStr();
   let txt;
   if(D.prov==='claude'){
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':D.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
