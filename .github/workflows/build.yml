@@ -48,7 +48,7 @@ jobs:
           }
           EOF
           cat > plugins.src.js <<'EOF'
-          import { Capacitor } from '@capacitor/core';
+          import { Capacitor, registerPlugin } from '@capacitor/core';
           import { SpeechRecognition } from '@capgo/capacitor-speech-recognition';
           import { TextToSpeech } from '@capacitor-community/text-to-speech';
           import { AppLauncher } from '@capacitor/app-launcher';
@@ -60,7 +60,8 @@ jobs:
           window.JV = {
             native: Capacitor.isNativePlatform(),
             SR: SpeechRecognition, TTS: TextToSpeech, AL: AppLauncher, LN: LocalNotifications,
-            DV: Device, GEO: Geolocation, CB: Clipboard, SH: Share
+            DV: Device, GEO: Geolocation, CB: Clipboard, SH: Share,
+            KA: registerPlugin('KeepAlive')
           };
           EOF
           cat > capacitor.config.json <<'EOF'
@@ -95,12 +96,24 @@ jobs:
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
               <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
               <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
+              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
               <queries>
                   <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
                   <intent><action android:name="android.speech.RecognitionService"/></intent>
               </queries>
           """
           s = s.replace('</manifest>', add + '</manifest>')
+
+          svc = """
+                  <service android:name=".KeepAliveService" android:exported="false" android:foregroundServiceType="specialUse">
+                      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="otomasi latar belakang"/>
+                  </service>
+              """
+          s = s.replace('</application>', svc + '</application>')
 
           if 'windowSoftInputMode' in s:
               s = re.sub(r'android:windowSoftInputMode="[^"]*"', 'android:windowSoftInputMode="adjustResize"', s)
@@ -142,6 +155,153 @@ jobs:
               with open(r + 'mipmap-anydpi-v26/' + n + '.xml', 'w', encoding='utf-8') as f:
                   f.write(icon)
           PY
+
+      - name: Kode native latar belakang
+        run: |
+          D=android/app/src/main/java/com/jarvis/agent
+          mkdir -p $D
+          cat > $D/MainActivity.java <<'EOF'
+          package com.jarvis.agent;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              registerPlugin(KeepAlivePlugin.class);
+              super.onCreate(savedInstanceState);
+            }
+          }
+          EOF
+          cat > $D/KeepAliveService.java <<'EOF'
+          package com.jarvis.agent;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.pm.ServiceInfo;
+          import android.os.Build;
+          import android.os.IBinder;
+          import android.os.PowerManager;
+
+          public class KeepAliveService extends Service {
+            private PowerManager.WakeLock wl;
+
+            @Override
+            public IBinder onBind(Intent i) { return null; }
+
+            @Override
+            public int onStartCommand(Intent intent, int flags, int startId) {
+              try {
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                Notification.Builder b;
+                if (Build.VERSION.SDK_INT >= 26) {
+                  nm.createNotificationChannel(new NotificationChannel("jarvis_bg", "Jarvis aktif", NotificationManager.IMPORTANCE_LOW));
+                  b = new Notification.Builder(this, "jarvis_bg");
+                } else {
+                  b = new Notification.Builder(this);
+                }
+                PendingIntent pi = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
+                Notification n = b.setContentTitle("Jarvis aktif")
+                  .setContentText("Otomasi berjalan di latar belakang")
+                  .setSmallIcon(android.R.drawable.ic_dialog_info)
+                  .setContentIntent(pi)
+                  .setOngoing(true)
+                  .build();
+                if (Build.VERSION.SDK_INT >= 34) {
+                  startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                } else {
+                  startForeground(1, n);
+                }
+                if (wl == null) {
+                  PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                  wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jarvis:ka");
+                  wl.acquire();
+                }
+              } catch (Exception e) {
+                stopSelf();
+              }
+              return START_STICKY;
+            }
+
+            @Override
+            public void onDestroy() {
+              if (wl != null && wl.isHeld()) wl.release();
+              super.onDestroy();
+            }
+          }
+          EOF
+          cat > $D/KeepAlivePlugin.java <<'EOF'
+          package com.jarvis.agent;
+
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.content.pm.ResolveInfo;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.provider.Settings;
+          import com.getcapacitor.JSArray;
+          import com.getcapacitor.JSObject;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+
+          @CapacitorPlugin(name = "KeepAlive")
+          public class KeepAlivePlugin extends Plugin {
+            @PluginMethod
+            public void start(PluginCall call) {
+              Intent i = new Intent(getContext(), KeepAliveService.class);
+              if (Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(i);
+              else getContext().startService(i);
+              call.resolve();
+            }
+
+            @PluginMethod
+            public void stop(PluginCall call) {
+              getContext().stopService(new Intent(getContext(), KeepAliveService.class));
+              call.resolve();
+            }
+
+            @PluginMethod
+            public void battery(PluginCall call) {
+              go(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName())));
+              call.resolve();
+            }
+
+            @PluginMethod
+            public void overlay(PluginCall call) {
+              go(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName())));
+              call.resolve();
+            }
+
+            @PluginMethod
+            public void apps(PluginCall call) {
+              PackageManager pm = getContext().getPackageManager();
+              Intent q = new Intent(Intent.ACTION_MAIN);
+              q.addCategory(Intent.CATEGORY_LAUNCHER);
+              JSArray arr = new JSArray();
+              for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
+                JSObject o = new JSObject();
+                o.put("n", ri.loadLabel(pm).toString());
+                o.put("v", ri.activityInfo.packageName);
+                arr.put(o);
+              }
+              JSObject res = new JSObject();
+              res.put("apps", arr);
+              call.resolve(res);
+            }
+
+            private void go(Intent i) {
+              i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+              getContext().startActivity(i);
+            }
+          }
+          EOF
 
       - name: Sinkronkan dan bangun APK
         run: |
