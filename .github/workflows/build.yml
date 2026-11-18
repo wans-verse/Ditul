@@ -112,6 +112,10 @@ jobs:
                   <service android:name=".KeepAliveService" android:exported="false" android:foregroundServiceType="specialUse">
                       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="otomasi latar belakang"/>
                   </service>
+                  <receiver android:name=".VoiceWidget" android:label="Jarvis Suara" android:exported="false">
+                      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+                      <meta-data android:name="android.appwidget.provider" android:resource="@xml/voice_widget_info"/>
+                  </receiver>
               """
           s = s.replace('</application>', svc + '</application>')
 
@@ -154,6 +158,47 @@ jobs:
           for n in ('ic_launcher', 'ic_launcher_round'):
               with open(r + 'mipmap-anydpi-v26/' + n + '.xml', 'w', encoding='utf-8') as f:
                   f.write(icon)
+
+          os.makedirs(r + 'layout', exist_ok=True)
+          os.makedirs(r + 'xml', exist_ok=True)
+
+          with open(r + 'drawable/widget_bg.xml', 'w', encoding='utf-8') as f:
+              f.write("""<?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="#E6101522"/>
+              <corners android:radius="28dp"/>
+          </shape>""")
+
+          with open(r + 'drawable/widget_orb.xml', 'w', encoding='utf-8') as f:
+              f.write("""<?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+              <gradient android:type="radial" android:centerX="0.35" android:centerY="0.3" android:gradientRadius="60dp"
+                  android:startColor="#FF9AD2FF" android:centerColor="#FF2E8CFF" android:endColor="#FF0A3FCF"/>
+          </shape>""")
+
+          with open(r + 'layout/widget_voice.xml', 'w', encoding='utf-8') as f:
+              f.write("""<?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/vw_root"
+              android:layout_width="match_parent" android:layout_height="match_parent"
+              android:orientation="vertical" android:gravity="center"
+              android:background="@drawable/widget_bg">
+              <ImageView android:layout_width="56dp" android:layout_height="56dp"
+                  android:src="@drawable/widget_orb" android:contentDescription="Bicara"/>
+              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                  android:layout_marginTop="6dp" android:text="Bicara"
+                  android:textColor="#FFFFFFFF" android:textSize="13sp"/>
+          </LinearLayout>""")
+
+          with open(r + 'xml/voice_widget_info.xml', 'w', encoding='utf-8') as f:
+              f.write("""<?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="110dp" android:minHeight="110dp"
+              android:targetCellWidth="2" android:targetCellHeight="2"
+              android:updatePeriodMillis="0"
+              android:initialLayout="@layout/widget_voice"
+              android:resizeMode="none"
+              android:widgetCategory="home_screen"/>""")
           PY
 
       - name: Kode native latar belakang
@@ -163,14 +208,36 @@ jobs:
           cat > $D/MainActivity.java <<'EOF'
           package com.jarvis.agent;
 
+          import android.content.Intent;
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
+            static boolean pendingVoice = false;
+
             @Override
             public void onCreate(Bundle savedInstanceState) {
               registerPlugin(KeepAlivePlugin.class);
               super.onCreate(savedInstanceState);
+              check(getIntent(), false);
+            }
+
+            @Override
+            protected void onNewIntent(Intent intent) {
+              super.onNewIntent(intent);
+              setIntent(intent);
+              check(intent, true);
+            }
+
+            private void check(Intent i, boolean warm) {
+              if (i != null && i.getBooleanExtra("suara", false)) {
+                i.removeExtra("suara");
+                pendingVoice = true;
+                if (warm && getBridge() != null && getBridge().getWebView() != null) {
+                  getBridge().getWebView().post(() ->
+                    getBridge().getWebView().evaluateJavascript("window.dispatchEvent(new Event('jv-voice'))", null));
+                }
+              }
             }
           }
           EOF
@@ -239,7 +306,10 @@ jobs:
           package com.jarvis.agent;
 
           import android.content.Intent;
+          import android.app.AlarmManager;
+          import android.content.Context;
           import android.content.pm.PackageManager;
+          import android.os.PowerManager;
           import android.content.pm.ResolveInfo;
           import android.net.Uri;
           import android.os.Build;
@@ -296,9 +366,68 @@ jobs:
               call.resolve(res);
             }
 
-            private void go(Intent i) {
+          @PluginMethod
+          public void pending(PluginCall call) {
+            JSObject o = new JSObject();
+            o.put("v", MainActivity.pendingVoice);
+            MainActivity.pendingVoice = false;
+            call.resolve(o);
+          }
+
+          @PluginMethod
+          public void status(PluginCall call) {
+            Context c = getContext();
+            PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
+            boolean ex = true;
+            if (Build.VERSION.SDK_INT >= 31) {
+              AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+              ex = am.canScheduleExactAlarms();
+            }
+            JSObject o = new JSObject();
+            o.put("battery", pm.isIgnoringBatteryOptimizations(c.getPackageName()));
+            o.put("overlay", Settings.canDrawOverlays(c));
+            o.put("exact", ex);
+            call.resolve(o);
+          }
+
+          @PluginMethod
+          public void exact(PluginCall call) {
+            if (Build.VERSION.SDK_INT >= 31) {
+              go(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getContext().getPackageName())));
+            }
+            call.resolve();
+          }
+
+          private void go(Intent i) {
               i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
               getContext().startActivity(i);
+            }
+          }
+          EOF
+
+          cat > $D/VoiceWidget.java <<'EOF'
+          package com.jarvis.agent;
+
+          import android.app.PendingIntent;
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.widget.RemoteViews;
+
+          public class VoiceWidget extends AppWidgetProvider {
+            @Override
+            public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
+              for (int id : ids) {
+                Intent i = new Intent(c, MainActivity.class);
+                i.setAction("com.jarvis.agent.VOICE");
+                i.putExtra("suara", true);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                PendingIntent pi = PendingIntent.getActivity(c, 7, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_voice);
+                v.setOnClickPendingIntent(R.id.vw_root, pi);
+                m.updateAppWidget(id, v);
+              }
             }
           }
           EOF
