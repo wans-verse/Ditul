@@ -739,7 +739,7 @@ function norm(x){
   else{const d=[...new Set((Array.isArray(t.days)?t.days:[]).map(Number).filter(n=>n>=1&&n<=7))].sort((p,q)=>p-q);
     trig={type:'waktu',time:tm?String(Math.min(23,+tm[1])).padStart(2,'0')+':'+tm[2]:'07:00',days:d.length?d:ALL.slice()}}
   const raw=Array.isArray(x.acts)?x.acts:x.act?[x.act]:[];
-  const acts=raw.slice(0,10).map(a=>({type:ACT[a&&a.type]?a.type:'notif',val:String((a&&a.val)||'').slice(0,300),...(a&&a.val2?{val2:String(a.val2).slice(0,500)}:{})}));
+  const acts=raw.slice(0,20).map(a=>({type:ACT[a&&a.type]?a.type:'notif',val:String((a&&a.val)||'').slice(0,300),...(a&&a.val2?{val2:String(a.val2).slice(0,500)}:{})}));
   const cn=x.cond&&CL[x.cond.type]?{type:x.cond.type,...(x.cond.val?{val:Math.min(99,Math.max(1,+x.cond.val))}:{})}:null;
   return acts.length?{name:String(x.name||'Aturan baru').slice(0,40),trig,acts,...(cn?{cond:cn}:{})}:null;
 }
@@ -927,6 +927,7 @@ $('#aSave').onclick=()=>{
   const acts=AC2.map(a=>({type:a.type,val:(a.val||'').trim(),...(a.type==='http'&&a.val2&&a.val2.trim()?{val2:a.val2.trim()}:{})}));
   if(!acts.length){toast('Tambah minimal satu aksi.');return}
   const bad=acts.find(a=>a.type!=='notif'&&!a.val);if(bad){toast('Isi aksi "'+ACT[bad.type]+'" dulu.');return}
+  const ph=acts.find(a=>/<(TOKEN|CHAT_ID|TOPIK)>/.test(a.val));if(ph){toast('Ganti '+(/<(TOKEN|CHAT_ID|TOPIK)>/.exec(ph.val)[0])+' di aksi webhook dulu.');return}
   let r=ed&&A.rules.find(x=>x.id===ed);
   if(r)Object.assign(r,{name,trig,acts,cond});else{r={id:Date.now()%1e8,on:true,name,trig,acts,cond};A.rules.push(r)}
   saveA();closeA();renderA();sched(r);
@@ -936,14 +937,42 @@ $('#aAddAct').onclick=()=>{AC2.push({type:'notif',val:''});drawActs()};
 $('#aTrigSel').onchange=()=>setTrig($('#aTrigSel').value);
 $('#aClose').onclick=closeA;$('#scrim').addEventListener('click',closeA);$('#aAdd').onclick=()=>openA(0);
 
-const TPL=[
-  ['Pengingat pagi',{name:'Pengingat pagi',trig:{type:'waktu',time:'07:00',days:ALL},acts:[{type:'notif',val:'Selamat pagi, cek rencana hari ini.'}]}],
-  ['Baterai di bawah 20%',{name:'Baterai rendah',trig:{type:'baterai',val:20},acts:[{type:'notif',val:'Baterai di bawah 20%, colok charger.'},{type:'ucap',val:'Baterai tinggal sedikit'}]}],
-  ['Charger dicabut',{name:'Charger dicabut',trig:{type:'cabut'},acts:[{type:'ucap',val:'Charger dicabut'}]}],
-  ['Suara: buka WhatsApp',{name:'Suara: buka WhatsApp',trig:{type:'suara',kata:'buka whatsapp'},acts:[{type:'app',val:'com.whatsapp'}]}],
-  ['Tombol buka WhatsApp',{name:'Buka WhatsApp',trig:{type:'manual'},acts:[{type:'app',val:'com.whatsapp'}]}],
-  ['Ingatkan colok malam',{name:'Ingatkan colok charger',trig:{type:'waktu',time:'21:00',days:ALL},cond:{type:'bl',val:50},acts:[{type:'notif',val:'Baterai di bawah 50%, colok charger.'}]}]];
-TPL.forEach(([l,x])=>{const b=document.createElement('button');b.className='chip glass';b.textContent=l;b.onclick=()=>openA(0,x);$('#aTpl').appendChild(b)});
+const W=s=>({type:'tunggu',val:String(s)}),VOL=(p,j)=>({type:'volume',val:String(p),val2:j||'media'}),SEN=m=>({type:'senter',val:m});
+const kedip=[];for(let i=0;i<5;i++)kedip.push(SEN('on'),W(1),SEN('off'),W(1));
+const KOSONG={type:'masuk',r:150};
+const TG=[
+  ['Harian',[
+    ['Pengingat pagi',{name:'Pengingat pagi',trig:{type:'waktu',time:'07:00',days:ALL},acts:[{type:'notif',val:'Selamat pagi, cek rencana hari ini.'}]}],
+    ['Ingatkan colok malam',{name:'Ingatkan colok charger',trig:{type:'waktu',time:'21:00',days:ALL},cond:{type:'bl',val:50},acts:[{type:'notif',val:'Baterai di bawah 50%, colok charger.'}]}],
+    ['Mode tidur (jam 22:00)',{name:'Mode tidur',trig:{type:'waktu',time:'22:00',days:ALL},acts:[{type:'ucap',val:'Selamat tidur'},SEN('off'),VOL(0,'media'),VOL(20,'dering')]}]]],
+  ['Baterai',[
+    ['Baterai di bawah 20%',{name:'Baterai rendah',trig:{type:'baterai',val:20},acts:[{type:'notif',val:'Baterai di bawah 20%, colok charger.'},{type:'ucap',val:'Baterai tinggal sedikit'}]}],
+    ['Baterai kritis (15%)',{name:'Baterai kritis',trig:{type:'baterai',val:15},cond:{type:'nc'},acts:[{type:'ucap',val:'Baterai tinggal sedikit'},{type:'notif',val:'Baterai kritis, hemat daya atau colok charger.'},VOL(0,'media')]}],
+    ['Charger dicabut',{name:'Charger dicabut',trig:{type:'cabut'},acts:[{type:'ucap',val:'Charger dicabut'}]}]]],
+  ['Lokasi (pilih tempat dulu)',[
+    ['Tiba di rumah',{name:'Tiba di rumah',trig:{...KOSONG},acts:[VOL(80,'dering'),{type:'ucap',val:'Selamat datang di rumah'},{type:'app',val:'com.spotify.music'}]}],
+    ['Pergi dari rumah',{name:'Pergi dari rumah',trig:{...KOSONG,type:'keluar'},acts:[{type:'notif',val:'Cek kunci, dompet, dan charger.'}]}],
+    ['Lapor Telegram saat tiba',{name:'Lapor Telegram',trig:{...KOSONG},acts:[{type:'http',val:'https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>&text=Sudah sampai'}]}],
+    ['Lapor ntfy saat tiba (mudah)',{name:'Lapor ntfy',trig:{...KOSONG},acts:[{type:'http',val:'https://ntfy.sh/<TOPIK>/publish?message=Sudah sampai'}]}]]],
+  ['Suara',[
+    ['Suara: buka WhatsApp',{name:'Suara: buka WhatsApp',trig:{type:'suara',kata:'buka whatsapp'},acts:[{type:'app',val:'com.whatsapp'}]}],
+    ['Suara: mode tidur',{name:'Mode tidur (suara)',trig:{type:'suara',kata:'mode tidur'},acts:[{type:'ucap',val:'Selamat tidur'},SEN('off'),VOL(0,'media'),VOL(20,'dering')]}],
+    ['Suara: senter darurat',{name:'Senter darurat',trig:{type:'suara',kata:'senter'},acts:[SEN('on'),W(60),SEN('off')]}]]],
+  ['Senter',[
+    ['Tombol: kedip peringatan',{name:'Kedip peringatan',trig:{type:'manual'},acts:kedip}],
+    ['Tombol: senter 60 detik',{name:'Senter 60 detik',trig:{type:'manual'},acts:[SEN('on'),W(60),SEN('off')]}]]],
+  ['Trading (jam musim dingin)',[
+    ['Sesi London 15:00',{name:'Sesi London',trig:{type:'waktu',time:'15:00',days:[2,3,4,5,6]},acts:[{type:'notif',val:'Sesi London buka.'},{type:'app',val:'net.metaquotes.metatrader5'}]}],
+    ['Sesi New York 20:00',{name:'Sesi New York',trig:{type:'waktu',time:'20:00',days:[2,3,4,5,6]},acts:[{type:'notif',val:'Sesi New York buka.'},{type:'app',val:'net.metaquotes.metatrader5'}]}]]]];
+function tplOpen(){
+  const m=$('#ddm'),l=m.querySelector('.ddl');l.textContent='';
+  TG.forEach(([g,items])=>{
+    const h=document.createElement('div');h.className='ddg';h.textContent=g;l.appendChild(h);
+    items.forEach(([lb,x])=>{const i=document.createElement('div');i.className='ddi';const t=document.createElement('span');t.textContent=lb;i.append(t);
+      i.onclick=()=>{m.classList.remove('on');openA(0,x)};l.appendChild(i)})});
+  m.classList.add('on');l.scrollTop=0;
+}
+{const b=document.createElement('button');b.className='chip glass';b.textContent='Contoh aturan ›';b.onclick=tplOpen;$('#aTpl').appendChild(b)}
 
 async function ai(text){
   const P='Ubah permintaan pengguna menjadi satu aturan otomatisasi HP. Balas HANYA JSON tanpa markdown: {"name":"nama singkat","trig":T,"acts":[aksi berurutan]}. T salah satu: {"type":"waktu","time":"HH:MM","days":[1-7, 1=Minggu, setiap hari=1,2,3,4,5,6,7]}, {"type":"sekali","at":"YYYY-MM-DDTHH:mm waktu lokal"}, {"type":"baterai","val":persen di bawah}, {"type":"colok"}, {"type":"cabut"}, {"type":"manual"}, {"type":"suara","kata":"kata yang diucapkan pengguna"}. Boleh tambah "cond":{"type":"bl|bg|ch|nc","val":persen} (bl baterai di bawah, bg di atas, ch sedang dicas, nc tidak dicas). Aksi: {"type":"notif|ucap|app|url|salin|bagi|http|tunggu|senter|volume","val":"pesan, kalimat, nama paket Android, tautan, teks, alamat webhook, jumlah detik, untuk senter: on/off/toggle, untuk volume: persen 0-100 atau +N/-N","val2":"isi JSON untuk http, atau jenis volume media/dering/alarm/notifikasi, opsional"}. Sekarang: '+nowStr();
@@ -1027,7 +1056,7 @@ async function permFlow(){if(!KA)return;
   await sq(()=>GEO&&GEO.requestPermissions());
   sq(()=>KA.start());
   const Q=A.pq=A.pq||{};
-  const steps=[['battery','bat',()=>KA.battery()],['overlay','ov',()=>KA.overlay()],['exact','ex',()=>KA.exact()]];
+  const steps=[['battery','bat',()=>KA.battery()],['overlay','ov',()=>KA.overlay()],['exact','ex',()=>KA.exact()],['bgloc','bg',()=>{toast('Pilih Izin › Lokasi › Selalu izinkan');return KA.bgLocation()}]];
   for(const [k,q,go] of steps){
     let st;try{st=await KA.status()}catch(e){return}
     if(st[k]||(Q[q]||0)>=2)continue;
