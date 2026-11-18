@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<script>try{var t=localStorage.getItem('tema.v1');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}}catch(e){}</script>
+<script>try{if(/(?:^|;\s*)jvmode=voice/.test(document.cookie)){window.__VM=1;document.documentElement.style.cssText='display:none;background:transparent'}}catch(e){}
+try{var t=localStorage.getItem('tema.v1');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}}catch(e){}</script>
 <title>Jarvis</title>
 <style>
 :root{
@@ -215,7 +216,6 @@ details.more summary::-webkit-details-marker{display:none}details.more summary::
   <div class="ah"><h1>Otomasi</h1><div style="display:flex;gap:8px"><button class="ib2 glass" data-thm aria-label="Ganti tema"></button><button class="pill glass" id="aAdd">Tambah</button></div></div>
   <div class="ai"><input class="glass" id="aIn" placeholder="" enterkeyhint="go" autocomplete="off"><button class="send" id="aMake">Buat</button></div>
   <div class="chips" id="aTpl"></div>
-  <div class="grp" style="margin:12px 0 0"><button class="row blue" id="aVoice">Coba perintah suara</button></div>
   <p class="ahd">Aturanmu · ketuk untuk lihat alur</p>
   <div id="aList"></div>
   <p class="cap" id="aEmpty" style="margin:0 6px 8px">Belum ada aturan. Pilih contoh di atas atau ketik aturanmu.</p>
@@ -304,6 +304,7 @@ details.more summary::-webkit-details-marker{display:none}details.more summary::
 const $=s=>document.querySelector(s);
 const J=window.JV||{};
 const native=!!J.native;
+const VM=!!window.__VM;
 const SR=native?J.SR:null,TTS=native?J.TTS:null,AL=native?J.AL:null,LN=native?J.LN:null,
       DV=native?J.DV:null,GEO=native?J.GEO:null,CB=native?J.CB:null,SH=native?J.SH:null,KA=native?J.KA:null;
 
@@ -478,7 +479,7 @@ async function agentG(){
 const agent=()=>D.prov==='claude'?agentC():agentG();
 
 /* ---------- suara (bawaan sistem) ---------- */
-let stopSpeak=false,turn=0,busy=false,partial='',liveEl=null,lt=0,AC=null,cur=null,gOff=false,gWarned=false;
+let stopSpeak=false,turn=0,busy=false,partial='',liveEl=null,lt=0,AC=null,cur=null,gOff=false,gWarned=false,gErr='';
 function unlock(){
   try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}
 }
@@ -560,7 +561,7 @@ async function speak(text,force){
       }
       return;
     }catch(e){
-      gOff=true;
+      gOff=true;gErr=String(e&&e.message||e).slice(0,90);
       if(!gWarned){gWarned=true;note('Suara Gemini gagal ('+(e&&e.message||e).toString().slice(0,80)+'). Memakai suara sistem.')}
     }
   }
@@ -680,7 +681,7 @@ document.querySelectorAll('#sEng button').forEach(b=>b.onclick=()=>{
   if(b.dataset.e==='gemini'&&!D.keyG){engUI('Suara Gemini butuh kunci Gemini. Pilih Gemini di atas dan isi kuncinya dulu.');return}
   D.eng=b.dataset.e;gOff=false;gWarned=false;save();engUI();
 });
-$('#bTest').onclick=()=>{stopSpeaking();speak('Halo, aku '+(D.aiName||'Jarvis')+'. Senang bisa membantumu hari ini.',true).then(()=>{if(state==='speak')setState('idle')})};
+$('#bTest').onclick=()=>{stopSpeaking();gOff=false;speak('Halo, aku '+(D.aiName||'Jarvis')+'. Senang bisa membantumu hari ini.',true).then(()=>{if(state==='speak')setState('idle');if(gOff)toast('Suara Gemini gagal: '+gErr)})};
 document.querySelectorAll('#sProv button').forEach(b=>b.onclick=()=>{D.prov=b.dataset.p;save();provUI()});
 $('#sKey').oninput=()=>{const v=$('#sKey').value.trim();if(D.prov==='claude')D.key=v;else{D.keyG=v;gOff=false}save()};
 
@@ -747,12 +748,17 @@ async function sched(r){
       schedule:{on:all?{hour:h,minute:m}:{weekday:d,hour:h,minute:m},allowWhileIdle:true}}))});
   }catch(e){toast('Jadwal gagal: '+(e&&e.message||e))}
 }
-async function acOk(){try{unlock();if(AC&&AC.state!=='running')await Promise.race([AC.resume(),sleep(500)]);return !!AC&&AC.state==='running'}catch(e){return false}}
+async function acOk(){try{unlock();for(let i=0;i<6&&AC&&AC.state!=='running';i++){try{AC.resume()}catch(e){}await sleep(250)}return !!AC&&AC.state==='running'}catch(e){return false}}
 async function sayA(text){
-  const was=state;
+  const was=state;let why='';
   try{
-    if(useG()&&await acOk())await speak(text,true);
-    else if(TTS)await TTS.speak({text,lang:'id-ID',rate:+D.rate||1,pitch:1,volume:1});
+    if(D.eng!=='gemini')why='mesin suara diset Suara sistem';
+    else if(!D.keyG)why='kunci Gemini kosong';
+    else{
+      gOff=false;
+      if(await acOk()){await speak(text,true);if(gOff)toast('Suara Gemini gagal: '+gErr);return}
+      why='audio diblokir, butuh APK baru dari build.yml terbaru'}
+    if(TTS){if(D.eng==='gemini')toast('Memakai suara sistem: '+why);await TTS.speak({text,lang:'id-ID',rate:+D.rate||1,pitch:1,volume:1})}
   }finally{if(state==='speak')setState(was==='speak'?'idle':was)}
 }
 async function step(a,r){
@@ -782,7 +788,7 @@ function fire(rid){
   if(r.trig.type==='sekali'){r.on=false;saveA()}
   if(r.acts.length===1&&r.acts[0].type==='notif'&&!r.cond)log(r,'notifikasi tampil');else run(r);
 }
-if(LN){
+if(LN&&!VM){
   LN.addListener('localNotificationReceived',n=>fire(n.extra&&n.extra.rid));
   LN.addListener('localNotificationActionPerformed',e=>fire(e.notification&&e.notification.extra&&e.notification.extra.rid));
 }
@@ -797,7 +803,7 @@ async function tick(){
   if(GEO&&lk.length)try{const p=(await GEO.getCurrentPosition({enableHighAccuracy:false,timeout:15000})).coords;
     lk.forEach(r=>{const t=r.trig,i=dist(p.latitude,p.longitude,t.lat,t.lng)<=t.r,was=ins[r.id];ins[r.id]=i;if(was!==undefined&&was!==i&&(t.type==='masuk')===i)run(r)})}catch(e){}
 }
-setInterval(tick,20000);setTimeout(tick,3000);
+if(!VM){setInterval(tick,20000);setTimeout(tick,3000)}
 
 /* ---------- perintah suara (dipanggil widget) ---------- */
 let vcBusy=false;
@@ -988,11 +994,11 @@ function tickT(){const n=new Date(),k=n.getHours()*60+n.getMinutes(),dk=n.getDay
   A.rules.forEach(r=>{if(!r.on)return;const t=r.trig;
     if(t.type==='waktu'){const [h,m]=t.time.split(':').map(Number);if(h*60+m===k&&t.days.includes(dk)&&lm[r.id]!==ymd+k){lm[r.id]=ymd+k;fire(r.id)}}
     else if(t.type==='sekali'){const at=new Date(t.at);if(n>=at&&n-at<12e4&&lm[r.id]!==t.at){lm[r.id]=t.at;fire(r.id)}}})}
-setInterval(tickT,15000);
+if(!VM)setInterval(tickT,15000);
 async function loadApps(q){if(!KA){if(!q)noKA();return}
   try{const r=await KA.apps(),seen={};A.inst=(r.apps||[]).filter(x=>x.v&&!seen[x.v]&&(seen[x.v]=1)).sort((p,o)=>p.n.localeCompare(o.n,'id'));saveA();if(!q)toast(A.inst.length+' aplikasi dimuat.')}
   catch(e){if(!q)toast('Gagal memuat. Butuh APK baru dari build.yml terbaru.')}}
-setTimeout(()=>loadApps(1),1500);
+if(!VM)setTimeout(()=>loadApps(1),1500);
 const noKA=()=>toast('Butuh APK baru dari build.yml terbaru.');
 function waitBack(go,ok){return new Promise(res=>{
   let seen=false,done=false,iv,to;
@@ -1016,18 +1022,15 @@ async function permFlow(){if(!KA)return;
     await waitBack(go,async()=>{try{return !!(await KA.status())[k]}catch(e){return true}});
   }
 }
-setTimeout(permFlow,800);
+if(!VM)setTimeout(permFlow,800);
 function tab(t){document.body.classList.toggle('at',t==='a');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));if(t==='a')renderA()}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 renderA();
 window.jarvisVoice=voiceCmd;
-$('#aVoice').onclick=voiceCmd;
-const vcGo=()=>setTimeout(voiceCmd,600);
-if(/suara/.test(location.hash+location.search))vcGo();
-const vcCheck=async()=>{if(!KA)return;try{const r=await KA.pending();if(r&&r.v)vcGo()}catch(e){}};
-window.addEventListener('jv-voice',vcCheck);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)vcCheck()});
-setTimeout(vcCheck,1500);
+if(VM){
+  setTimeout(async()=>{try{await voiceCmd()}catch(e){}try{await KA.close()}catch(e){}},400);
+  setTimeout(()=>{try{KA.close()}catch(e){}},120000);
+}
 
 /* ---------- keyboard & mulai ---------- */
 const vv=window.visualViewport;
