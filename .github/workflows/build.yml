@@ -1,0 +1,126 @@
+name: Build APK Jarvis
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Siapkan proyek
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          cat > package.json <<'EOF'
+          {
+            "name": "jarvis",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^8.0.0",
+              "@capacitor/android": "^8.0.0",
+              "@capacitor/app-launcher": "^8.0.0",
+              "@capacitor/clipboard": "^8.0.0",
+              "@capacitor/device": "^8.0.0",
+              "@capacitor/geolocation": "^8.0.0",
+              "@capacitor/local-notifications": "^8.0.0",
+              "@capacitor/share": "^8.0.0",
+              "@capacitor-community/text-to-speech": "^8.0.0",
+              "@capgo/capacitor-speech-recognition": "^8.0.0"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "^8.0.0"
+            }
+          }
+          EOF
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.jarvis.agent",
+            "appName": "Jarvis",
+            "webDir": "www",
+            "server": { "androidScheme": "https" },
+            "plugins": { "CapacitorHttp": { "enabled": true } }
+          }
+          EOF
+
+      - name: Pasang dependensi dan buat proyek Android
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+
+      - name: Izin, ikon, dan pengaturan keyboard
+        run: |
+          python3 - <<'PY'
+          import os, re
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          add = '''
+              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+              <queries>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
+                  <intent><action android:name="android.speech.RecognitionService"/></intent>
+              </queries>
+          '''
+          s = s.replace('</manifest>', add + '</manifest>')
+          if 'windowSoftInputMode' in s:
+              s = re.sub(r'android:windowSoftInputMode="[^"]*"', 'android:windowSoftInputMode="adjustResize"', s)
+          else:
+              s = s.replace('<activity', '<activity android:windowSoftInputMode="adjustResize"', 1)
+          open(p, 'w', encoding='utf-8').write(s)
+
+          r = 'android/app/src/main/res/'
+          os.makedirs(r + 'drawable', exist_ok=True)
+          os.makedirs(r + 'values', exist_ok=True)
+          os.makedirs(r + 'mipmap-anydpi-v26', exist_ok=True)
+          open(r + 'drawable/jarvis_fg.xml', 'w').write('''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:aapt="http://schemas.android.com/aapt"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:pathData="M54,54m-23,0a23,23 0,1 1,46 0a23,23 0,1 1,-46 0">
+                  <aapt:attr name="android:fillColor">
+                      <gradient android:type="radial" android:centerX="46" android:centerY="44" android:gradientRadius="34">
+                          <item android:offset="0" android:color="#FFD4ECFF"/>
+                          <item android:offset="0.35" android:color="#FF4AA8FF"/>
+                          <item android:offset="0.7" android:color="#FF0A5CFF"/>
+                          <item android:offset="1" android:color="#FF1A2A86"/>
+                      </gradient>
+                  </aapt:attr>
+              </path>
+          </vector>
+          ''')
+          open(r + 'values/ic_launcher_background.xml', 'w').write('<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#05070D</color></resources>')
+          icon = '<?xml version="1.0" encoding="utf-8"?><adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/ic_launcher_background"/><foreground android:drawable="@drawable/jarvis_fg"/></adaptive-icon>'
+          for n in ('ic_launcher', 'ic_launcher_round'):
+              open(r + 'mipmap-anydpi-v26/' + n + '.xml', 'w').write(icon)
+          PY
+
+      - name: Sinkronkan dan bangun APK
+        run: |
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
