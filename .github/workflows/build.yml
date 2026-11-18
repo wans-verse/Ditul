@@ -112,6 +112,7 @@ jobs:
                   <service android:name=".KeepAliveService" android:exported="false" android:foregroundServiceType="specialUse">
                       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="otomasi latar belakang"/>
                   </service>
+                  <activity android:name=".VoiceActivity" android:theme="@style/VoiceTheme" android:taskAffinity="" android:excludeFromRecents="true" android:exported="false" android:launchMode="singleTask" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"/>
                   <receiver android:name=".VoiceWidget" android:label="Jarvis Suara" android:exported="false">
                       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
                       <meta-data android:name="android.appwidget.provider" android:resource="@xml/voice_widget_info"/>
@@ -162,12 +163,18 @@ jobs:
           os.makedirs(r + 'layout', exist_ok=True)
           os.makedirs(r + 'xml', exist_ok=True)
 
-          with open(r + 'drawable/widget_bg.xml', 'w', encoding='utf-8') as f:
+          with open(r + 'values/voice_theme.xml', 'w', encoding='utf-8') as f:
               f.write("""<?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-              <solid android:color="#E6101522"/>
-              <corners android:radius="28dp"/>
-          </shape>""")
+          <resources>
+              <style name="VoiceTheme" parent="Theme.AppCompat.NoActionBar">
+                  <item name="android:windowIsTranslucent">true</item>
+                  <item name="android:windowBackground">@android:color/transparent</item>
+                  <item name="android:backgroundDimEnabled">false</item>
+                  <item name="android:windowAnimationStyle">@null</item>
+                  <item name="android:windowNoTitle">true</item>
+                  <item name="android:windowContentTransitions">false</item>
+              </style>
+          </resources>""")
 
           with open(r + 'drawable/widget_orb.xml', 'w', encoding='utf-8') as f:
               f.write("""<?xml version="1.0" encoding="utf-8"?>
@@ -181,13 +188,13 @@ jobs:
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:id="@+id/vw_root"
               android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:gravity="center"
-              android:background="@drawable/widget_bg">
-              <ImageView android:layout_width="56dp" android:layout_height="56dp"
+              android:orientation="vertical" android:gravity="center">
+              <ImageView android:layout_width="64dp" android:layout_height="64dp"
                   android:src="@drawable/widget_orb" android:contentDescription="Bicara"/>
               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                   android:layout_marginTop="6dp" android:text="Bicara"
-                  android:textColor="#FFFFFFFF" android:textSize="13sp"/>
+                  android:textColor="#FFFFFFFF" android:textSize="13sp"
+                  android:shadowColor="#CC000000" android:shadowRadius="6" android:shadowDx="0" android:shadowDy="1"/>
           </LinearLayout>""")
 
           with open(r + 'xml/voice_widget_info.xml', 'w', encoding='utf-8') as f:
@@ -217,8 +224,15 @@ jobs:
 
             @Override
             public void onCreate(Bundle savedInstanceState) {
+              android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
+              cm.setAcceptCookie(true);
+              cm.setCookie("https://localhost", "jvmode=main; path=/");
+              cm.flush();
               registerPlugin(KeepAlivePlugin.class);
               super.onCreate(savedInstanceState);
+              if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+              }
               check(getIntent(), false);
             }
 
@@ -367,6 +381,12 @@ jobs:
             }
 
           @PluginMethod
+          public void close(PluginCall call) {
+            call.resolve();
+            if (getActivity() != null) getActivity().finish();
+          }
+
+          @PluginMethod
           public void pending(PluginCall call) {
             JSObject o = new JSObject();
             o.put("v", MainActivity.pendingVoice);
@@ -405,6 +425,42 @@ jobs:
           }
           EOF
 
+          cat > $D/VoiceActivity.java <<'EOF'
+          package com.jarvis.agent;
+
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.webkit.CookieManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class VoiceActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              CookieManager cm = CookieManager.getInstance();
+              cm.setAcceptCookie(true);
+              cm.setCookie("https://localhost", "jvmode=voice; path=/");
+              cm.flush();
+              registerPlugin(KeepAlivePlugin.class);
+              super.onCreate(savedInstanceState);
+              if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().setBackgroundColor(Color.TRANSPARENT);
+                getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+              }
+              new Handler(Looper.getMainLooper()).postDelayed(() -> { if (!isFinishing()) finish(); }, 150000);
+            }
+
+            @Override
+            public void onDestroy() {
+              CookieManager cm = CookieManager.getInstance();
+              cm.setCookie("https://localhost", "jvmode=main; path=/");
+              cm.flush();
+              super.onDestroy();
+            }
+          }
+          EOF
+
           cat > $D/VoiceWidget.java <<'EOF'
           package com.jarvis.agent;
 
@@ -419,10 +475,10 @@ jobs:
             @Override
             public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
               for (int id : ids) {
-                Intent i = new Intent(c, MainActivity.class);
+                Intent i = new Intent(c, VoiceActivity.class);
                 i.setAction("com.jarvis.agent.VOICE");
                 i.putExtra("suara", true);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 PendingIntent pi = PendingIntent.getActivity(c, 7, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_voice);
                 v.setOnClickPendingIntent(R.id.vw_root, pi);
