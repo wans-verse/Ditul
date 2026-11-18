@@ -183,19 +183,37 @@ jobs:
                   android:startColor="#FF9AD2FF" android:centerColor="#FF2E8CFF" android:endColor="#FF0A3FCF"/>
           </shape>""")
 
+          def lay(listening):
+              ring = ''
+              if listening:
+                  frames = ''.join('<ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_ring_%d"/>' % k for k in range(8))
+                  ring = '<ViewFlipper android:layout_width="match_parent" android:layout_height="match_parent" android:autoStart="true" android:flipInterval="90">' + frames + '</ViewFlipper>'
+              label = 'Mendengarkan' if listening else 'Bicara'
+              return ('<?xml version="1.0" encoding="utf-8"?>\n'
+                  '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/vw_root" '
+                  'android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">'
+                  '<FrameLayout android:layout_width="84dp" android:layout_height="84dp">' + ring +
+                  '<ImageView android:layout_width="64dp" android:layout_height="64dp" android:layout_gravity="center" android:src="@drawable/widget_orb" android:contentDescription="Bicara"/>'
+                  '</FrameLayout>'
+                  '<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="' + label + '" '
+                  'android:textColor="#FFFFFFFF" android:textSize="13sp" android:shadowColor="#CC000000" android:shadowRadius="6" android:shadowDx="0" android:shadowDy="1"/>'
+                  '</LinearLayout>')
+
           with open(r + 'layout/widget_voice.xml', 'w', encoding='utf-8') as f:
-              f.write("""<?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:id="@+id/vw_root"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:gravity="center">
-              <ImageView android:layout_width="64dp" android:layout_height="64dp"
-                  android:src="@drawable/widget_orb" android:contentDescription="Bicara"/>
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                  android:layout_marginTop="6dp" android:text="Bicara"
-                  android:textColor="#FFFFFFFF" android:textSize="13sp"
-                  android:shadowColor="#CC000000" android:shadowRadius="6" android:shadowDx="0" android:shadowDy="1"/>
-          </LinearLayout>""")
+              f.write(lay(False))
+          with open(r + 'layout/widget_voice_listen.xml', 'w', encoding='utf-8') as f:
+              f.write(lay(True))
+
+          for k in range(8):
+              t = k / 7.0
+              p = int(round(3 + 9 * (1 - t)))
+              a = int(round(230 * (1 - t)))
+              with open(r + 'drawable/widget_ring_%d.xml' % k, 'w', encoding='utf-8') as f:
+                  f.write('<?xml version="1.0" encoding="utf-8"?>'
+                      '<inset xmlns:android="http://schemas.android.com/apk/res/android" '
+                      'android:insetLeft="%d%%" android:insetTop="%d%%" android:insetRight="%d%%" android:insetBottom="%d%%">'
+                      '<shape android:shape="oval"><stroke android:width="3dp" android:color="#%02X4AA8FF"/><solid android:color="#00000000"/></shape>'
+                      '</inset>' % (p, p, p, p, a))
 
           with open(r + 'xml/voice_widget_info.xml', 'w', encoding='utf-8') as f:
               f.write("""<?xml version="1.0" encoding="utf-8"?>
@@ -436,8 +454,12 @@ jobs:
           import com.getcapacitor.BridgeActivity;
 
           public class VoiceActivity extends BridgeActivity {
+            static int alive = 0;
+
             @Override
             public void onCreate(Bundle savedInstanceState) {
+              alive++;
+              VoiceWidget.setListening(this, true);
               CookieManager cm = CookieManager.getInstance();
               cm.setAcceptCookie(true);
               cm.setCookie("https://localhost", "jvmode=voice; path=/");
@@ -456,6 +478,7 @@ jobs:
               CookieManager cm = CookieManager.getInstance();
               cm.setCookie("https://localhost", "jvmode=main; path=/");
               cm.flush();
+              if (--alive <= 0) { alive = 0; VoiceWidget.setListening(this, false); }
               super.onDestroy();
             }
           }
@@ -467,23 +490,34 @@ jobs:
           import android.app.PendingIntent;
           import android.appwidget.AppWidgetManager;
           import android.appwidget.AppWidgetProvider;
+          import android.content.ComponentName;
           import android.content.Context;
           import android.content.Intent;
           import android.widget.RemoteViews;
 
           public class VoiceWidget extends AppWidgetProvider {
+            static RemoteViews build(Context c, boolean listening) {
+              Intent i = new Intent(c, VoiceActivity.class);
+              i.setAction("com.jarvis.agent.VOICE");
+              i.putExtra("suara", true);
+              i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+              PendingIntent pi = PendingIntent.getActivity(c, 7, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+              RemoteViews v = new RemoteViews(c.getPackageName(), listening ? R.layout.widget_voice_listen : R.layout.widget_voice);
+              v.setOnClickPendingIntent(R.id.vw_root, pi);
+              return v;
+            }
+
+            static void setListening(Context c, boolean on) {
+              try {
+                AppWidgetManager m = AppWidgetManager.getInstance(c);
+                int[] ids = m.getAppWidgetIds(new ComponentName(c, VoiceWidget.class));
+                for (int id : ids) m.updateAppWidget(id, build(c, on));
+              } catch (Exception e) {}
+            }
+
             @Override
             public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
-              for (int id : ids) {
-                Intent i = new Intent(c, VoiceActivity.class);
-                i.setAction("com.jarvis.agent.VOICE");
-                i.putExtra("suara", true);
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                PendingIntent pi = PendingIntent.getActivity(c, 7, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_voice);
-                v.setOnClickPendingIntent(R.id.vw_root, pi);
-                m.updateAppWidget(id, v);
-              }
+              for (int id : ids) m.updateAppWidget(id, build(c, false));
             }
           }
           EOF
