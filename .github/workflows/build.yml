@@ -83,7 +83,74 @@ jobs:
         run: |
           python3 - <<'PY'
           import os, re
+
           p = 'android/app/src/main/AndroidManifest.xml'
-          s = open(p, encoding='utf-8').read()
-          add = '''
+          with open(p, 'r', encoding='utf-8') as f:
+              s = f.read()
+
+          add = """
               <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+              <queries>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
+                  <intent><action android:name="android.speech.RecognitionService"/></intent>
+              </queries>
+          """
+          s = s.replace('</manifest>', add + '</manifest>')
+
+          if 'windowSoftInputMode' in s:
+              s = re.sub(r'android:windowSoftInputMode="[^"]*"', 'android:windowSoftInputMode="adjustResize"', s)
+          else:
+              s = s.replace('<activity', '<activity android:windowSoftInputMode="adjustResize"', 1)
+
+          with open(p, 'w', encoding='utf-8') as f:
+              f.write(s)
+
+          r = 'android/app/src/main/res/'
+          os.makedirs(r + 'drawable', exist_ok=True)
+          os.makedirs(r + 'values', exist_ok=True)
+          os.makedirs(r + 'mipmap-anydpi-v26', exist_ok=True)
+
+          fg_content = """<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:aapt="http://schemas.android.com/aapt"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:pathData="M54,54m-23,0a23,23 0,1 1,46 0a23,23 0,1 1,-46 0">
+                  <aapt:attr name="android:fillColor">
+                      <gradient android:type="radial" android:centerX="46" android:centerY="44" android:gradientRadius="34">
+                          <item android:offset="0" android:color="#FFD4ECFF"/>
+                          <item android:offset="0.35" android:color="#FF4AA8FF"/>
+                          <item android:offset="0.7" android:color="#FF0A5CFF"/>
+                          <item android:offset="1" android:color="#FF1A2A86"/>
+                      </gradient>
+                  </aapt:attr>
+              </path>
+          </vector>"""
+          with open(r + 'drawable/jarvis_fg.xml', 'w', encoding='utf-8') as f:
+              f.write(fg_content)
+
+          with open(r + 'values/ic_launcher_background.xml', 'w', encoding='utf-8') as f:
+              f.write('<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#05070D</color></resources>')
+
+          icon = '<?xml version="1.0" encoding="utf-8"?><adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/ic_launcher_background"/><foreground android:drawable="@drawable/jarvis_fg"/></adaptive-icon>'
+          for n in ('ic_launcher', 'ic_launcher_round'):
+              with open(r + 'mipmap-anydpi-v26/' + n + '.xml', 'w', encoding='utf-8') as f:
+                  f.write(icon)
+          PY
+
+      - name: Sinkronkan dan bangun APK
+        run: |
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
