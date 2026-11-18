@@ -40,7 +40,7 @@ button{font-family:inherit;cursor:pointer}
 .ttl span{font-size:11px;color:var(--tx2);white-space:nowrap}
 
 /* percakapan */
-.chat{position:absolute;inset:0;overflow-y:auto;padding:calc(var(--st) + 68px) 16px calc(var(--sb) + 86px);scroll-behavior:smooth}
+.chat{position:absolute;inset:0;overflow-y:auto;padding:calc(var(--st) + 68px) 16px calc(var(--sb) + 146px);scroll-behavior:smooth}
 .chat::-webkit-scrollbar{display:none}
 .b{width:fit-content;max-width:82%;padding:9px 14px;border-radius:20px;line-height:1.3;margin:3px 0;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
 .b.u{margin-left:auto;background:var(--blue);color:#fff;border-bottom-right-radius:6px}
@@ -55,9 +55,10 @@ button{font-family:inherit;cursor:pointer}
 .chip{border-radius:18px;padding:9px 14px;font-size:15px;color:var(--tx)}
 
 /* bawah */
-.dock{position:absolute;left:0;right:0;bottom:0;z-index:5;padding:8px 14px calc(var(--sb) + 8px);display:flex;gap:10px;align-items:center;pointer-events:none}
+.dock{position:absolute;left:0;right:0;bottom:calc(var(--sb) + 64px);z-index:5;padding:8px 14px 8px;display:flex;gap:10px;align-items:center;pointer-events:none}
 .dock>*{pointer-events:auto}
-.kb .dock{padding-bottom:10px}
+.kb .dock{bottom:0;padding-bottom:10px}
+.kb .tabbar{display:none}
 .field{flex:1;display:flex;align-items:center;height:52px;border-radius:26px;padding:0 8px 0 18px;min-width:0}
 .field input{flex:1;min-width:0;border:0;background:none;outline:0;font:inherit;color:var(--tx);user-select:text;-webkit-user-select:text}
 .field input::placeholder{color:var(--tx2)}
@@ -109,6 +110,47 @@ body.sh .sheet{transform:none}
 .mem+.mem{box-shadow:inset 0 .5px 0 var(--tx3)}
 .mem button{border:0;background:none;color:#ff3b30;font-size:15px;flex:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* tab bawah */
+.tabbar{position:fixed;left:14px;right:14px;bottom:calc(var(--sb) + 8px);z-index:6;height:50px;border-radius:25px;display:flex;padding:3px;gap:3px}
+.tabbar button{flex:1;border:0;background:none;border-radius:22px;color:var(--tx2);font-size:15px;font-weight:600}
+.tabbar button.on{background:var(--segon);color:var(--blue);box-shadow:0 2px 6px rgba(0,0,0,.18)}
+body.at .top,body.at .chat,body.at .dock{display:none}
+/* otomasi */
+.auto{display:none;position:fixed;inset:0;z-index:4;overflow-y:auto;padding:calc(var(--st) + 12px) 16px calc(var(--sb) + 84px)}
+.auto::-webkit-scrollbar{display:none}
+body.at .auto{display:block}
+.auto input,.asheet input{user-select:text;-webkit-user-select:text}
+.auto [hidden],.asheet [hidden]{display:none!important}
+.ah{display:flex;align-items:center;justify-content:space-between}
+.ah h1{font-size:34px;line-height:1.1;margin:0;font-weight:700;letter-spacing:-.025em}
+.ah .pill{height:38px;padding:0 15px;font-size:15px;font-weight:600}
+.asub{margin:6px 0 16px;color:var(--tx2);font-size:15px;line-height:1.35}
+.ai{display:flex;gap:8px;margin-bottom:12px}
+.ai input{flex:1;min-width:0;height:48px;border-radius:24px;padding:0 18px;border:0;outline:0;font:inherit;font-size:16px;color:var(--tx)}
+.ai input::placeholder{color:var(--tx2)}
+.ai .send{height:48px;border-radius:24px;padding:0 20px}
+.ahd{font-size:13px;font-weight:600;color:var(--tx2);margin:18px 6px 8px}
+.rule{border-radius:20px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.rule .rt{flex:1;min-width:0}
+.rule b{display:block;font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rule span{display:block;font-size:13px;color:var(--tx2);line-height:1.3;margin-top:2px;overflow-wrap:anywhere}
+.rule .mini{border:0;background:var(--fill);color:var(--blue);font-size:13px;font-weight:600;height:30px;padding:0 12px;border-radius:15px;flex:none}
+.alog{border-radius:20px;padding:12px 16px;font-size:13px;color:var(--tx2);line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.row input[type=time],.row input[type=number]{flex:1;min-width:0;text-align:right;border:0;background:none;outline:0;color:var(--tx);font:inherit}
+.days{display:flex;gap:4px;margin:0 16px 8px}
+.days button{flex:1;border:0;border-radius:10px;padding:9px 0;font-size:13px;font-weight:600;background:var(--fill);color:var(--tx)}
+.days button.on{background:var(--blue);color:#fff}
+.asheet{position:fixed;z-index:9;left:8px;right:8px;bottom:calc(var(--sb) + 8px);max-height:84%;border-radius:34px;display:flex;flex-direction:column;background:var(--gl2);transform:translateY(112%);transition:transform .38s cubic-bezier(.2,.85,.25,1)}
+body.as .scrim{opacity:1;pointer-events:auto}
+body.as .asheet{transform:none}
+.toast{position:fixed;left:50%;bottom:calc(var(--sb) + 72px);transform:translateX(-50%);z-index:12;max-width:88%;padding:10px 16px;border-radius:18px;font-size:14px;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.row input[type=datetime-local]{flex:1;min-width:0;text-align:right;border:0;background:none;outline:0;color:var(--tx);font:inherit}
+.asheet .mini{border:0;background:var(--fill);color:var(--blue);font-size:13px;font-weight:600;height:30px;padding:0 12px;border-radius:15px;flex:none}
+.asheet .mini.del{color:#ff3b30}
+.asheet .row select{min-width:0}
+.chips .chip.on{background:var(--blue);color:#fff}
 </style>
 </head>
 <body data-s="idle">
@@ -136,6 +178,26 @@ body.sh .sheet{transform:none}
     <button class="orb" id="orb" aria-label="Bicara"></button>
   </footer>
 </div>
+
+<section class="auto" id="auto">
+  <div class="ah"><h1>Otomasi</h1><button class="pill glass" id="aAdd">Tambah</button></div>
+  <p class="asub">Aturan jika-maka untuk HP kamu. Terpisah dari Jarvis.</p>
+  <div class="ai"><input class="glass" id="aIn" placeholder="Ketik aturan, misalnya: tiap jam 6 pagi ingatkan minum" enterkeyhint="go" autocomplete="off"><button class="send" id="aMake">Buat</button></div>
+  <div class="chips" id="aTpl"></div>
+  <p class="ahd">Aturanmu</p>
+  <div id="aList"></div>
+  <p class="cap" id="aEmpty" style="margin:0 6px 8px">Belum ada aturan. Pilih template di atas atau ketik aturanmu.</p>
+  <p class="ahd">Aplikasiku</p>
+  <div class="chips" id="aApps"></div>
+  <p class="cap" style="margin:8px 6px">Ketuk untuk memilih. Yang kamu pilih muncul sebagai pilihan di aksi Buka aplikasi. Daftar ini belum membaca aplikasi terpasang, jadi aplikasi lain ditambah manual di bawah.</p>
+  <div class="grp" style="margin:0 0 8px"><label class="row"><span>Nama</span><input id="aAN" type="text" placeholder="Bank" autocomplete="off"></label><label class="row"><span>Paket atau tautan</span><input id="aAP" type="text" placeholder="com.bank.app" autocomplete="off"></label><button class="row blue" id="aAAdd">Tambah ke Aplikasiku</button></div>
+  <p class="ahd">Riwayat</p>
+  <div class="alog glass" id="aLog"></div>
+  <div class="grp" style="margin:16px 0 8px"><button class="row blue" id="aExp">Salin semua aturan</button><button class="row blue" id="aImp">Tempel aturan</button></div>
+  <p class="cap" style="margin:0 6px 18px">Aturan jam tetap berbunyi walau aplikasi ditutup; aturan dengan banyak aksi jalan setelah notifikasinya diketuk. Baterai dan charger hanya dicek saat aplikasi terbuka.</p>
+</section>
+<nav class="tabbar glass" id="tabs"><button class="on" data-t="j">Jarvis</button><button data-t="a">Otomasi</button></nav>
+<div class="toast glass" id="toast"></div>
 
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" aria-label="Pengaturan">
@@ -177,6 +239,23 @@ body.sh .sheet{transform:none}
       <div id="memList"></div>
       <button class="row act" id="bForget">Hapus semua ingatan</button>
     </div>
+  </div>
+</section>
+
+<section class="asheet" id="aSheet" aria-label="Aturan">
+  <div class="shead"><b id="aTitle">Aturan baru</b><button class="pill glass" id="aClose">Batal</button></div>
+  <div class="sbody">
+    <div class="grp">
+      <label class="row"><span>Nama</span><input id="aName" type="text" placeholder="Pengingat pagi" autocomplete="off"></label>
+      <label class="row"><span>Jika</span><select id="aTrigSel"><option value="waktu">Setiap jam tertentu</option><option value="sekali">Sekali pada tanggal</option><option value="baterai">Baterai di bawah</option><option value="colok">Charger dicolok</option><option value="cabut">Charger dicabut</option><option value="manual">Tombol saja</option></select></label>
+    </div>
+    <div id="rWaktu"><div class="grp"><label class="row"><span>Jam</span><input id="aTime" type="time"></label></div><div class="days" id="aDays"></div></div>
+    <div class="grp" id="rSekali"><label class="row"><span>Tanggal dan jam</span><input id="aSekali" type="datetime-local"></label></div>
+    <div class="grp" id="rBat"><label class="row"><span>Di bawah (%)</span><input id="aBat" type="number" min="1" max="99" inputmode="numeric"></label></div>
+    <p class="ahd" style="margin:6px 24px 8px">Lalu jalankan, berurutan</p>
+    <div id="aActs"></div>
+    <div class="grp"><button class="row blue" id="aAddAct">Tambah aksi</button></div>
+    <div class="grp"><button class="row blue" id="aSave">Simpan</button><button class="row act" id="aDel">Hapus aturan</button></div>
   </div>
 </section>
 
@@ -564,6 +643,220 @@ document.querySelectorAll('#sEng button').forEach(b=>b.onclick=()=>{
 $('#bTest').onclick=()=>{stopSpeaking();speak('Halo, aku Jarvis. Senang bisa membantumu hari ini.',true).then(()=>{if(state==='speak')setState('idle')})};
 document.querySelectorAll('#sProv button').forEach(b=>b.onclick=()=>{D.prov=b.dataset.p;save();provUI()});
 $('#sKey').oninput=()=>{const v=$('#sKey').value.trim();if(D.prov==='claude')D.key=v;else{D.keyG=v;gOff=false}save()};
+
+/* ---------- OTOMASI (tab sendiri, data terpisah dari Jarvis) ---------- */
+const AK='otomasi.v1';
+let A=Object.assign({rules:[],log:[]},(()=>{try{return JSON.parse(localStorage.getItem(AK)||'{}')}catch(e){return{}}})());
+A.rules.forEach(r=>{if(!r.acts){r.acts=[r.act||{type:'notif',val:''}];delete r.act}});
+A.apps=Array.isArray(A.apps)?A.apps:[];
+const saveA=()=>{try{localStorage.setItem(AK,JSON.stringify(A))}catch(e){}};
+const DN=['','Min','Sen','Sel','Rab','Kam','Jum','Sab'],ALL=[1,2,3,4,5,6,7];
+const ACT={notif:'Kirim notifikasi',ucap:'Ucapkan',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim HTTP (webhook)',tunggu:'Tunggu (detik)'};
+const PH={notif:'Isi pesan',ucap:'Kalimat yang diucapkan',app:'Nama paket, mis. com.whatsapp',url:'https://, tel:, sms:, geo:',salin:'Teks yang disalin',bagi:'Teks yang dibagikan',http:'https://… alamat webhook',tunggu:'Berapa detik'};
+const fmt=d=>new Date(d).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+let tt=0,trigT='waktu',days=ALL.slice(),ed=0,AC2=[],lastChg=null;const hit={},lf={};
+function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2800)}
+const cbw=t=>CB?CB.write({string:t}):navigator.clipboard.writeText(t);
+const cbr=async()=>CB?(await CB.read()).value:await navigator.clipboard.readText();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const when=r=>{const t=r.trig;return t.type==='waktu'?'Jam '+t.time+(t.days.length===7?', setiap hari':', '+t.days.map(d=>DN[d]).join(' ')):t.type==='sekali'?'Sekali, '+fmt(t.at):t.type==='baterai'?'Baterai di bawah '+t.val+'%':t.type==='colok'?'Charger dicolok':t.type==='cabut'?'Charger dicabut':'Tombol saja'};
+const sum=r=>when(r)+'. '+r.acts.map(a=>ACT[a.type]+(a.val?' ('+(a.val.length>22?a.val.slice(0,22)+'…':a.val)+')':'')).join(', lalu ')+'.';
+function log(r,m){A.log.unshift({t:Date.now(),s:r.name+': '+m});A.log=A.log.slice(0,20);saveA();renderA()}
+function norm(x){
+  if(!x||!x.trig)return null;
+  const t=x.trig,tm=/^(\d{1,2}):(\d{2})$/.exec(String(t.time||''));let trig;
+  if(t.type==='baterai')trig={type:'baterai',val:Math.min(99,Math.max(1,+t.val||20))};
+  else if(t.type==='sekali'){const at=String(t.at||'').slice(0,16);if(isNaN(new Date(at)))return null;trig={type:'sekali',at}}
+  else if(['colok','cabut','manual'].includes(t.type))trig={type:t.type};
+  else{const d=[...new Set((Array.isArray(t.days)?t.days:[]).map(Number).filter(n=>n>=1&&n<=7))].sort((p,q)=>p-q);
+    trig={type:'waktu',time:tm?String(Math.min(23,+tm[1])).padStart(2,'0')+':'+tm[2]:'07:00',days:d.length?d:ALL.slice()}}
+  const raw=Array.isArray(x.acts)?x.acts:x.act?[x.act]:[];
+  const acts=raw.slice(0,10).map(a=>({type:ACT[a&&a.type]?a.type:'notif',val:String((a&&a.val)||'').slice(0,300),...(a&&a.val2?{val2:String(a.val2).slice(0,500)}:{})}));
+  return acts.length?{name:String(x.name||'Aturan baru').slice(0,40),trig,acts}:null;
+}
+async function sched(r){
+  if(!LN)return;
+  try{
+    await LN.cancel({notifications:[0,1,2,3,4,5,6,7].map(k=>({id:r.id*8+k}))});
+    const t=r.trig;if(!r.on||(t.type!=='waktu'&&t.type!=='sekali'))return;
+    const p=await LN.requestPermissions();if(p.display==='denied'){toast('Izin notifikasi ditolak.');return}
+    const one=r.acts.length===1&&r.acts[0].type==='notif',body=one?(r.acts[0].val||r.name):'Ketuk untuk menjalankan aturan ini.';
+    if(t.type==='sekali'){
+      const at=new Date(t.at);if(isNaN(at)||at<=new Date()){toast('Waktunya sudah lewat.');return}
+      await LN.schedule({notifications:[{id:r.id*8,title:r.name,body,extra:{rid:r.id},schedule:{at,allowWhileIdle:true}}]});return}
+    const [h,m]=t.time.split(':').map(Number),all=t.days.length===7,ds=all?[0]:t.days;
+    await LN.schedule({notifications:ds.map(d=>({id:r.id*8+d,title:r.name,body,extra:{rid:r.id},
+      schedule:{on:all?{hour:h,minute:m}:{weekday:d,hour:h,minute:m},allowWhileIdle:true}}))});
+  }catch(e){toast('Jadwal gagal: '+(e&&e.message||e))}
+}
+async function step(a,r){
+  const v=a.val||'';
+  if(a.type==='notif'){
+    if(!LN){toast(v||r.name);return}
+    const p=await LN.requestPermissions();if(p.display==='denied')throw new Error('izin notifikasi ditolak');
+    await LN.schedule({notifications:[{id:Math.floor(Math.random()*2e9),title:r.name,body:v||r.name,schedule:{at:new Date(Date.now()+1000),allowWhileIdle:true}}]});
+  }else if(a.type==='ucap'){if(!TTS)throw new Error('suara hanya di aplikasi Android');await TTS.speak({text:v,lang:'id-ID',rate:1,pitch:1,volume:1})}
+  else if(a.type==='salin'){await cbw(v);toast('Tersalin.')}
+  else if(a.type==='bagi'){if(!SH)throw new Error('hanya di aplikasi Android');await SH.share({title:r.name,text:v,dialogTitle:'Bagikan'})}
+  else if(a.type==='http'){const res=await fetch(v,a.val2?{method:'POST',headers:{'content-type':'application/json'},body:a.val2}:{});if(!res.ok)throw new Error('HTTP '+res.status)}
+  else if(a.type==='tunggu')await sleep(Math.min(300,Math.max(0,+v||0))*1000);
+  else{if(!AL)throw new Error('hanya jalan di aplikasi Android');await AL.openUrl({url:v})}
+}
+async function run(r){
+  for(const a of r.acts){
+    try{await step(a,r)}catch(e){const m=e&&e.message||e;toast('Gagal: '+m);log(r,'gagal di "'+ACT[a.type]+'", '+m);return}
+  }
+  log(r,'berhasil');
+}
+function fire(rid){
+  const r=A.rules.find(x=>x.id===rid);if(!r)return;
+  if(Date.now()-(lf[rid]||0)<10000)return;lf[rid]=Date.now();
+  if(r.trig.type==='sekali'){r.on=false;saveA()}
+  if(r.acts.length===1&&r.acts[0].type==='notif')log(r,'notifikasi tampil');else run(r);
+}
+if(LN){
+  LN.addListener('localNotificationReceived',n=>fire(n.extra&&n.extra.rid));
+  LN.addListener('localNotificationActionPerformed',e=>fire(e.notification&&e.notification.extra&&e.notification.extra.rid));
+}
+async function tick(){
+  if(!DV)return;
+  const rs=A.rules.filter(r=>r.on&&['baterai','colok','cabut'].includes(r.trig.type));
+  if(!rs.length){lastChg=null;return}
+  try{const b=await DV.getBatteryInfo(),lv=Math.round((b.batteryLevel||0)*100),ch=!!b.isCharging,changed=lastChg!==null&&ch!==lastChg;lastChg=ch;
+    rs.forEach(r=>{const t=r.trig.type;
+      if(t==='baterai'){if(lv<r.trig.val){if(!hit[r.id]){hit[r.id]=1;run(r)}}else hit[r.id]=0}
+      else if(changed&&(t==='colok')===ch)run(r)})}catch(e){}
+}
+setInterval(tick,20000);setTimeout(tick,3000);
+
+const CAT=[['Pesan (SMS)','sms:'],['Email','mailto:'],['WhatsApp','com.whatsapp'],['Telegram','org.telegram.messenger'],['Discord','com.discord'],['Instagram','com.instagram.android'],['YouTube','com.google.android.youtube'],['Chrome','com.android.chrome'],['Maps','com.google.android.apps.maps'],['Gmail','com.google.android.gm'],['Spotify','com.spotify.music'],['Pengaturan','com.android.settings'],['TradingView','com.tradingview.tradingviewapp'],['MetaTrader 5','net.metaquotes.metatrader5']].map(([n,v])=>({n,v}));
+const picked=v=>A.apps.some(x=>x.v===v);
+function renderApps(){
+  const w=$('#aApps');w.textContent='';
+  CAT.concat(A.apps.filter(x=>!CAT.some(c=>c.v===x.v))).forEach(x=>{
+    const b=document.createElement('button');b.className='chip glass'+(picked(x.v)?' on':'');b.textContent=x.n;
+    b.onclick=()=>{A.apps=picked(x.v)?A.apps.filter(y=>y.v!==x.v):A.apps.concat({n:x.n,v:x.v});saveA();renderApps()};w.appendChild(b)});
+}
+$('#aAAdd').onclick=()=>{
+  const v=$('#aAP').value.trim(),n=$('#aAN').value.trim()||v;
+  if(!v){toast('Isi nama paket atau tautannya dulu.');return}
+  if(!picked(v))A.apps.push({n,v});
+  saveA();$('#aAN').value='';$('#aAP').value='';renderApps();toast(n+' ditambahkan.');
+};
+function renderA(){
+  const l=$('#aList');l.textContent='';$('#aEmpty').hidden=!!A.rules.length;
+  A.rules.forEach(r=>{
+    const d=document.createElement('div');d.className='rule glass';
+    const t=document.createElement('div');t.className='rt';t.onclick=()=>openA(r.id);
+    const b=document.createElement('b');b.textContent=r.name;
+    const sp=document.createElement('span');sp.textContent=sum(r);t.append(b,sp);
+    const tes=document.createElement('button');tes.className='mini';tes.textContent=r.trig.type==='manual'?'Jalankan':'Tes';tes.onclick=()=>run(r);
+    const sw=document.createElement('label');sw.className='sw';
+    const ck=document.createElement('input');ck.type='checkbox';ck.checked=!!r.on;
+    ck.onchange=()=>{r.on=ck.checked;saveA();sched(r)};
+    sw.append(ck,document.createElement('i'));d.append(t,tes,sw);l.appendChild(d)});
+  renderApps();
+  $('#aLog').textContent=A.log.length?A.log.map(x=>fmt(x.t)+'  '+x.s).join('\n'):'Belum ada riwayat.';
+}
+function setTrig(t){trigT=t;$('#aTrigSel').value=t;$('#rWaktu').hidden=t!=='waktu';$('#rSekali').hidden=t!=='sekali';$('#rBat').hidden=t!=='baterai'}
+function drawDays(){
+  const w=$('#aDays');w.textContent='';
+  for(let d=1;d<=7;d++){const b=document.createElement('button');b.textContent=DN[d];b.className=days.includes(d)?'on':'';
+    b.onclick=()=>{days=days.includes(d)?days.filter(x=>x!==d):days.concat(d);drawDays()};w.appendChild(b)}
+}
+function drawActs(){
+  const w=$('#aActs');w.textContent='';
+  AC2.forEach((a,i)=>{
+    const g=document.createElement('div');g.className='grp';
+    const r1=document.createElement('div');r1.className='row';
+    const sel=document.createElement('select');
+    Object.keys(ACT).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=ACT[k];sel.appendChild(o)});
+    sel.value=a.type;sel.onchange=()=>{const was=a.type;a.type=sel.value;if(was==='app'||a.type==='app'){a.val='';a.man=false}drawActs()};
+    const x=document.createElement('button');x.className='mini del';x.textContent='Hapus';x.onclick=()=>{AC2.splice(i,1);drawActs()};
+    r1.append(sel,x);g.appendChild(r1);
+    const inp=(k,ph)=>{const r=document.createElement('div');r.className='row';const e=document.createElement('input');e.type='text';e.placeholder=ph;e.autocomplete='off';
+      e.value=a[k]||'';e.oninput=()=>{a[k]=e.value};r.appendChild(e);g.appendChild(r)};
+    if(a.type==='app'){
+      const opts=A.apps.concat(CAT.filter(c=>c.v===a.val&&!picked(c.v))),manual=a.man||(a.val&&!opts.some(o=>o.v===a.val));
+      const r=document.createElement('div');r.className='row';const s2=document.createElement('select');
+      [['','Pilih aplikasi']].concat(opts.map(o=>[o.v,o.n]),[['__m','Lainnya, ketik manual']]).forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;s2.appendChild(o)});
+      s2.value=manual?'__m':(a.val||'');
+      s2.onchange=()=>{a.man=s2.value==='__m';a.val=a.man?'':s2.value;drawActs()};
+      r.appendChild(s2);g.appendChild(r);if(manual)inp('val',PH.app);
+    }else{inp('val',PH[a.type]);if(a.type==='http')inp('val2','Isi JSON (kosong = GET)')}
+    w.appendChild(g)});
+}
+function openA(id,pre){
+  ed=id||0;
+  const d=new Date(Date.now()+36e5);d.setMinutes(0,0,0);
+  const r=id?A.rules.find(x=>x.id===id):(pre||{name:'',trig:{type:'waktu',time:'07:00',days:ALL},acts:[{type:'notif',val:''}]});
+  $('#aName').value=r.name;setTrig(r.trig.type);$('#aTime').value=r.trig.time||'07:00';$('#aBat').value=r.trig.val||20;
+  $('#aSekali').value=r.trig.at||new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+  days=(r.trig.days||ALL).slice();drawDays();AC2=r.acts.map(a=>({...a}));drawActs();
+  $('#aDel').hidden=!ed;$('#aTitle').textContent=ed?'Ubah aturan':'Aturan baru';document.body.classList.add('as');
+}
+const closeA=()=>document.body.classList.remove('as');
+$('#aSave').onclick=()=>{
+  const name=$('#aName').value.trim();if(!name){toast('Isi nama aturan dulu.');return}
+  let trig;
+  if(trigT==='waktu')trig={type:'waktu',time:$('#aTime').value||'07:00',days:(days.length?days:ALL).slice().sort((p,q)=>p-q)};
+  else if(trigT==='sekali'){const at=$('#aSekali').value;if(!at||isNaN(new Date(at))){toast('Pilih tanggal dan jamnya dulu.');return}trig={type:'sekali',at}}
+  else if(trigT==='baterai')trig={type:'baterai',val:Math.min(99,Math.max(1,+$('#aBat').value||20))};
+  else trig={type:trigT};
+  const acts=AC2.map(a=>({type:a.type,val:(a.val||'').trim(),...(a.type==='http'&&a.val2&&a.val2.trim()?{val2:a.val2.trim()}:{})}));
+  if(!acts.length){toast('Tambah minimal satu aksi.');return}
+  const bad=acts.find(a=>a.type!=='notif'&&!a.val);if(bad){toast('Isi aksi "'+ACT[bad.type]+'" dulu.');return}
+  let r=ed&&A.rules.find(x=>x.id===ed);
+  if(r)Object.assign(r,{name,trig,acts});else{r={id:Date.now()%1e8,on:true,name,trig,acts};A.rules.push(r)}
+  saveA();closeA();renderA();sched(r);
+};
+$('#aDel').onclick=()=>{const r=A.rules.find(x=>x.id===ed);if(!r)return;r.on=false;sched(r);A.rules=A.rules.filter(x=>x!==r);saveA();closeA();renderA()};
+$('#aAddAct').onclick=()=>{AC2.push({type:'notif',val:''});drawActs()};
+$('#aTrigSel').onchange=()=>setTrig($('#aTrigSel').value);
+$('#aClose').onclick=closeA;$('#scrim').addEventListener('click',closeA);$('#aAdd').onclick=()=>openA(0);
+
+const TPL=[
+  ['Pengingat pagi',{name:'Pengingat pagi',trig:{type:'waktu',time:'07:00',days:ALL},acts:[{type:'notif',val:'Selamat pagi, cek rencana hari ini.'}]}],
+  ['Baterai di bawah 20%',{name:'Baterai rendah',trig:{type:'baterai',val:20},acts:[{type:'notif',val:'Baterai di bawah 20%, colok charger.'},{type:'ucap',val:'Baterai tinggal sedikit'}]}],
+  ['Charger dicabut',{name:'Charger dicabut',trig:{type:'cabut'},acts:[{type:'ucap',val:'Charger dicabut'}]}],
+  ['Tombol buka WhatsApp',{name:'Buka WhatsApp',trig:{type:'manual'},acts:[{type:'app',val:'com.whatsapp'}]}],
+  ['Tombol buka SMS',{name:'Buka SMS',trig:{type:'manual'},acts:[{type:'app',val:'sms:'}]}]];
+TPL.forEach(([l,x])=>{const b=document.createElement('button');b.className='chip glass';b.textContent=l;b.onclick=()=>openA(0,x);$('#aTpl').appendChild(b)});
+
+async function ai(text){
+  const P='Ubah permintaan pengguna menjadi satu aturan otomatisasi HP. Balas HANYA JSON tanpa markdown: {"name":"nama singkat","trig":T,"acts":[aksi berurutan]}. T salah satu: {"type":"waktu","time":"HH:MM","days":[1-7, 1=Minggu, setiap hari=1,2,3,4,5,6,7]}, {"type":"sekali","at":"YYYY-MM-DDTHH:mm waktu lokal"}, {"type":"baterai","val":persen di bawah}, {"type":"colok"}, {"type":"cabut"}, {"type":"manual"}. Aksi: {"type":"notif|ucap|app|url|salin|bagi|http|tunggu","val":"pesan, kalimat, nama paket Android, tautan, teks, alamat webhook, atau jumlah detik","val2":"isi JSON untuk http, opsional"}. Sekarang: '+nowStr();
+  let txt;
+  if(D.prov==='claude'){
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':D.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:D.mod.claude,max_tokens:600,system:P,messages:[{role:'user',content:text}]})});
+    const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||'HTTP '+r.status);
+    txt=j.content.map(b=>b.text||'').join('');
+  }else{
+    const j=await gcall({systemInstruction:{parts:[{text:P}]},contents:[{role:'user',parts:[{text}]}],generationConfig:{maxOutputTokens:1536,responseMimeType:'application/json'}});
+    const c=j.candidates&&j.candidates[0];txt=((c&&c.content&&c.content.parts)||[]).filter(p=>p.text&&!p.thought).map(p=>p.text).join('');
+  }
+  const m=/\{[\s\S]*\}/.exec(txt);if(!m)throw new Error('jawaban AI tidak terbaca');
+  return norm(JSON.parse(m[0]));
+}
+$('#aMake').onclick=async()=>{
+  const t=$('#aIn').value.trim();if(!t)return;
+  if(!KEY()){toast('Isi kunci API dulu di Pengaturan tab Jarvis.');return}
+  const b=$('#aMake');b.disabled=true;b.textContent='…';
+  try{const x=await ai(t);if(!x)throw new Error('aturan tidak valid');$('#aIn').value='';openA(0,x)}
+  catch(e){toast('Gagal membuat aturan: '+(e&&e.message||e))}
+  b.disabled=false;b.textContent='Buat';
+};
+$('#aIn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#aMake').click()}};
+$('#aExp').onclick=async()=>{try{await cbw(JSON.stringify(A.rules));toast('Aturan disalin.')}catch(e){toast('Gagal menyalin.')}};
+$('#aImp').onclick=async()=>{
+  try{const x=JSON.parse(await cbr());if(!Array.isArray(x))throw 0;let n=0;
+    for(const y of x){const v=norm(y);if(v){const r={id:(Date.now()+n)%1e8,on:true,...v};A.rules.push(r);sched(r);n++}}
+    saveA();renderA();toast(n+' aturan ditempel.')}
+  catch(e){toast('Clipboard tidak berisi aturan yang valid.')}
+};
+function tab(t){document.body.classList.toggle('at',t==='a');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));if(t==='a')renderA()}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+renderA();
 
 /* ---------- keyboard & mulai ---------- */
 const vv=window.visualViewport;
