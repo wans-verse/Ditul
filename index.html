@@ -151,6 +151,17 @@ body.as .asheet{transform:none}
 .asheet .mini.del{color:#ff3b30}
 .asheet .row select{min-width:0}
 .chips .chip.on{background:var(--blue);color:#fff}
+.ic{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rule{flex-wrap:wrap;align-items:center}.rule b{white-space:normal}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex-basis:100%;margin-top:6px}
+.fs{display:inline-flex;align-items:center;gap:5px;font-style:normal;font-size:12px;font-weight:600;padding:5px 9px;border-radius:12px;background:var(--fill);max-width:100%;overflow-wrap:anywhere}
+.fs small{font-size:11px;font-weight:500;opacity:.65}
+.fs.j{color:var(--blue)}.fs.s{color:#ff9500}.fs.m{color:#34c759}
+.flow em{font-style:normal;color:var(--tx3);font-size:13px}
+.how{margin:0 4px 14px}
+#aTpl{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#aTpl::-webkit-scrollbar{display:none}#aTpl .chip{flex:none}
+details.more{margin-top:20px}details.more summary{font-size:13px;font-weight:600;color:var(--tx2);margin:0 6px 4px;list-style:none}
+details.more summary::-webkit-details-marker{display:none}details.more summary::after{content:" ›"}details.more[open] summary::after{content:" ⌄"}
 </style>
 </head>
 <body data-s="idle">
@@ -181,20 +192,22 @@ body.as .asheet{transform:none}
 
 <section class="auto" id="auto">
   <div class="ah"><h1>Otomasi</h1><button class="pill glass" id="aAdd">Tambah</button></div>
-  <p class="asub">Aturan jika-maka untuk HP kamu. Terpisah dari Jarvis.</p>
-  <div class="ai"><input class="glass" id="aIn" placeholder="Ketik aturan, misalnya: tiap jam 6 pagi ingatkan minum" enterkeyhint="go" autocomplete="off"><button class="send" id="aMake">Buat</button></div>
+  <p class="asub">Buat HP bekerja sendiri dengan pola sederhana:</p>
+  <div class="flow how"><i class="fs j" data-i="pin">Jika ini terjadi</i><em>›</em><i class="fs s" data-i="filter">dan syaratnya cocok</i><em>›</em><i class="fs m" data-i="bell">maka lakukan ini</i></div>
+  <div class="ai"><input class="glass" id="aIn" placeholder="Ketik aturan, mis: tiap jam 6 pagi ingatkan minum" enterkeyhint="go" autocomplete="off"><button class="send" id="aMake">Buat</button></div>
   <div class="chips" id="aTpl"></div>
   <p class="ahd">Aturanmu</p>
   <div id="aList"></div>
-  <p class="cap" id="aEmpty" style="margin:0 6px 8px">Belum ada aturan. Pilih template di atas atau ketik aturanmu.</p>
-  <p class="ahd">Aplikasiku</p>
-  <div class="chips" id="aApps"></div>
-  <p class="cap" style="margin:8px 6px">Ketuk untuk memilih. Yang kamu pilih muncul sebagai pilihan di aksi Buka aplikasi. Daftar ini belum membaca aplikasi terpasang, jadi aplikasi lain ditambah manual di bawah.</p>
-  <div class="grp" style="margin:0 0 8px"><label class="row"><span>Nama</span><input id="aAN" type="text" placeholder="Bank" autocomplete="off"></label><label class="row"><span>Paket atau tautan</span><input id="aAP" type="text" placeholder="com.bank.app" autocomplete="off"></label><button class="row blue" id="aAAdd">Tambah ke Aplikasiku</button></div>
-  <p class="ahd">Riwayat</p>
-  <div class="alog glass" id="aLog"></div>
-  <div class="grp" style="margin:16px 0 8px"><button class="row blue" id="aExp">Salin semua aturan</button><button class="row blue" id="aImp">Tempel aturan</button></div>
-  <p class="cap" style="margin:0 6px 18px">Aturan jam tetap berbunyi walau aplikasi ditutup; aturan dengan banyak aksi jalan setelah notifikasinya diketuk. Baterai dan charger hanya dicek saat aplikasi terbuka.</p>
+  <p class="cap" id="aEmpty" style="margin:0 6px 8px">Belum ada aturan. Pilih contoh di atas atau ketik aturanmu.</p>
+  <details class="more"><summary>Lainnya</summary>
+    <p class="ahd">Aplikasiku</p>
+    <div class="chips" id="aApps"></div>
+    <div class="grp" style="margin:10px 0 8px"><label class="row"><span>Nama</span><input id="aAN" type="text" placeholder="Bank" autocomplete="off"></label><label class="row"><span>Paket atau tautan</span><input id="aAP" type="text" placeholder="com.bank.app" autocomplete="off"></label><button class="row blue" id="aAAdd">Tambah ke Aplikasiku</button></div>
+    <p class="ahd">Riwayat</p>
+    <div class="alog glass" id="aLog"></div>
+    <div class="grp" style="margin:16px 0 8px"><button class="row blue" id="aExp">Salin semua aturan</button><button class="row blue" id="aImp">Tempel aturan</button></div>
+  </details>
+  <p class="cap" style="margin:14px 6px 18px">Jadwal jam tetap jalan walau aplikasi ditutup. Baterai, charger, dan lokasi hanya dicek saat aplikasi terbuka. Aturan yang punya syarat jalan setelah notifikasinya diketuk.</p>
 </section>
 <nav class="tabbar glass" id="tabs"><button class="on" data-t="j">Jarvis</button><button data-t="a">Otomasi</button></nav>
 <div class="toast glass" id="toast"></div>
@@ -247,12 +260,15 @@ body.as .asheet{transform:none}
   <div class="sbody">
     <div class="grp">
       <label class="row"><span>Nama</span><input id="aName" type="text" placeholder="Pengingat pagi" autocomplete="off"></label>
-      <label class="row"><span>Jika</span><select id="aTrigSel"><option value="waktu">Setiap jam tertentu</option><option value="sekali">Sekali pada tanggal</option><option value="baterai">Baterai di bawah</option><option value="colok">Charger dicolok</option><option value="cabut">Charger dicabut</option><option value="manual">Tombol saja</option></select></label>
+      <label class="row"><span>1. Jika</span><select id="aTrigSel"><option value="waktu">Setiap jam tertentu</option><option value="sekali">Sekali pada tanggal</option><option value="baterai">Baterai di bawah</option><option value="colok">Charger dicolok</option><option value="cabut">Charger dicabut</option><option value="masuk">Saya tiba di sebuah tempat</option><option value="keluar">Saya pergi dari sebuah tempat</option><option value="manual">Tombol saja</option></select></label>
     </div>
     <div id="rWaktu"><div class="grp"><label class="row"><span>Jam</span><input id="aTime" type="time"></label></div><div class="days" id="aDays"></div></div>
     <div class="grp" id="rSekali"><label class="row"><span>Tanggal dan jam</span><input id="aSekali" type="datetime-local"></label></div>
     <div class="grp" id="rBat"><label class="row"><span>Di bawah (%)</span><input id="aBat" type="number" min="1" max="99" inputmode="numeric"></label></div>
-    <p class="ahd" style="margin:6px 24px 8px">Lalu jalankan, berurutan</p>
+    <div class="grp" id="rLok"><button class="row blue" id="aLokNow">Pakai lokasi saya sekarang</button><label class="row"><span>Jarak (meter)</span><input id="aLokR" type="number" min="50" max="5000" inputmode="numeric"></label><p class="cap" id="aLokC" style="margin:0 16px 8px"></p></div>
+    <p class="ahd" style="margin:6px 24px 8px">2. Hanya jika (boleh kosong)</p>
+    <div class="grp"><label class="row"><span>Syarat</span><select id="aCond"><option value="">Tanpa syarat</option><option value="bl">Baterai di bawah</option><option value="bg">Baterai di atas</option><option value="ch">Sedang dicas</option><option value="nc">Tidak sedang dicas</option></select></label><label class="row" id="rCV"><span>Persen (%)</span><input id="aCV" type="number" min="1" max="99" inputmode="numeric"></label></div>
+    <p class="ahd" style="margin:6px 24px 8px">3. Maka lakukan ini, berurutan</p>
     <div id="aActs"></div>
     <div class="grp"><button class="row blue" id="aAddAct">Tambah aksi</button></div>
     <div class="grp"><button class="row blue" id="aSave">Simpan</button><button class="row act" id="aDel">Hapus aturan</button></div>
@@ -651,7 +667,22 @@ A.rules.forEach(r=>{if(!r.acts){r.acts=[r.act||{type:'notif',val:''}];delete r.a
 A.apps=Array.isArray(A.apps)?A.apps:[];
 const saveA=()=>{try{localStorage.setItem(AK,JSON.stringify(A))}catch(e){}};
 const DN=['','Min','Sen','Sel','Rab','Kam','Jum','Sab'],ALL=[1,2,3,4,5,6,7];
-const ACT={notif:'Kirim notifikasi',ucap:'Ucapkan',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim HTTP (webhook)',tunggu:'Tunggu (detik)'};
+const ACT={notif:'Munculkan notifikasi',ucap:'Ucapkan dengan suara',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim ke webhook',tunggu:'Tunggu beberapa detik'};
+const ACS={notif:'Notifikasi',ucap:'Ucapkan',app:'Buka app',url:'Buka tautan',salin:'Salin',bagi:'Bagikan',http:'Webhook',tunggu:'Tunggu'};
+const IC={clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',bat:'<rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v3"/>',plug:'<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',unplug:'<path d="M13 3L5 13h6l-1 8 8-10h-6zM4 4l16 16"/>',tap:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',pin:'<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',bell:'<path d="M6 16v-5a6 6 0 1112 0v5l2 2H4zM10 21h4"/>',speak:'<path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6"/>',app:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',share:'<path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',wait:'<path d="M7 3h10M7 21h10M8 3c0 6 8 6 8 18M16 3c0 6-8 6-8 18"/>',filter:'<path d="M4 5h16l-6 7v6l-4 2v-8z"/>'};
+const TI={waktu:'clock',sekali:'cal',baterai:'bat',colok:'plug',cabut:'unplug',manual:'tap',masuk:'pin',keluar:'pin'},AI2={notif:'bell',ucap:'speak',app:'app',url:'link',salin:'copy',bagi:'share',http:'globe',tunggu:'wait'};
+const CL={bl:'Baterai di bawah',bg:'Baterai di atas',ch:'Sedang dicas',nc:'Tidak sedang dicas'};
+const cdesc=c=>CL[c.type]+(c.val?' '+c.val+'%':'');
+const SV=k=>'<svg class="ic" viewBox="0 0 24 24">'+IC[k]+'</svg>';
+document.querySelectorAll('[data-i]').forEach(e=>e.insertAdjacentHTML('afterbegin',SV(e.dataset.i)));
+const tr=(t,n)=>t.length>n?t.slice(0,n)+'…':t;
+function fs(c,l,k,t){const e=document.createElement('i');e.className='fs '+c;e.innerHTML=SV(k);const m=document.createElement('small');m.textContent=l;e.append(m,t);return e}
+function flow(r){const w=document.createElement('div');w.className='flow';
+  const P=[['j','Jika',TI[r.trig.type],when(r)]];
+  if(r.cond&&CL[r.cond.type])P.push(['s','Syarat','filter',cdesc(r.cond)]);
+  r.acts.forEach((a,i)=>{const v=a.type==='app'?((A.apps.concat(CAT).find(x=>x.v===a.val)||{}).n||a.val):a.val;
+    P.push(['m',i?'Lalu':'Maka',AI2[a.type],ACS[a.type]+(a.type==='tunggu'?' '+v+' dtk':v?': '+tr(v,16):'')])});
+  P.forEach((p,i)=>{if(i){const m=document.createElement('em');m.textContent='›';w.appendChild(m)}w.appendChild(fs(...p))});return w}
 const PH={notif:'Isi pesan',ucap:'Kalimat yang diucapkan',app:'Nama paket, mis. com.whatsapp',url:'https://, tel:, sms:, geo:',salin:'Teks yang disalin',bagi:'Teks yang dibagikan',http:'https://… alamat webhook',tunggu:'Berapa detik'};
 const fmt=d=>new Date(d).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 let tt=0,trigT='waktu',days=ALL.slice(),ed=0,AC2=[],lastChg=null;const hit={},lf={};
@@ -659,7 +690,7 @@ function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clea
 const cbw=t=>CB?CB.write({string:t}):navigator.clipboard.writeText(t);
 const cbr=async()=>CB?(await CB.read()).value:await navigator.clipboard.readText();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const when=r=>{const t=r.trig;return t.type==='waktu'?'Jam '+t.time+(t.days.length===7?', setiap hari':', '+t.days.map(d=>DN[d]).join(' ')):t.type==='sekali'?'Sekali, '+fmt(t.at):t.type==='baterai'?'Baterai di bawah '+t.val+'%':t.type==='colok'?'Charger dicolok':t.type==='cabut'?'Charger dicabut':'Tombol saja'};
+const when=r=>{const t=r.trig;return t.type==='waktu'?'Jam '+t.time+(t.days.length===7?', setiap hari':', '+t.days.map(d=>DN[d]).join(' ')):t.type==='sekali'?'Sekali, '+fmt(t.at):t.type==='baterai'?'Baterai di bawah '+t.val+'%':t.type==='colok'?'Charger dicolok':t.type==='cabut'?'Charger dicabut':t.type==='masuk'?'Saya tiba di tempat tersimpan':t.type==='keluar'?'Saya pergi dari tempat tersimpan':'Tombol saja'};
 const sum=r=>when(r)+'. '+r.acts.map(a=>ACT[a.type]+(a.val?' ('+(a.val.length>22?a.val.slice(0,22)+'…':a.val)+')':'')).join(', lalu ')+'.';
 function log(r,m){A.log.unshift({t:Date.now(),s:r.name+': '+m});A.log=A.log.slice(0,20);saveA();renderA()}
 function norm(x){
@@ -667,12 +698,14 @@ function norm(x){
   const t=x.trig,tm=/^(\d{1,2}):(\d{2})$/.exec(String(t.time||''));let trig;
   if(t.type==='baterai')trig={type:'baterai',val:Math.min(99,Math.max(1,+t.val||20))};
   else if(t.type==='sekali'){const at=String(t.at||'').slice(0,16);if(isNaN(new Date(at)))return null;trig={type:'sekali',at}}
+  else if(t.type==='masuk'||t.type==='keluar'){if(isNaN(+t.lat)||isNaN(+t.lng))return null;trig={type:t.type,lat:+t.lat,lng:+t.lng,r:Math.min(5000,Math.max(50,+t.r||150))}}
   else if(['colok','cabut','manual'].includes(t.type))trig={type:t.type};
   else{const d=[...new Set((Array.isArray(t.days)?t.days:[]).map(Number).filter(n=>n>=1&&n<=7))].sort((p,q)=>p-q);
     trig={type:'waktu',time:tm?String(Math.min(23,+tm[1])).padStart(2,'0')+':'+tm[2]:'07:00',days:d.length?d:ALL.slice()}}
   const raw=Array.isArray(x.acts)?x.acts:x.act?[x.act]:[];
   const acts=raw.slice(0,10).map(a=>({type:ACT[a&&a.type]?a.type:'notif',val:String((a&&a.val)||'').slice(0,300),...(a&&a.val2?{val2:String(a.val2).slice(0,500)}:{})}));
-  return acts.length?{name:String(x.name||'Aturan baru').slice(0,40),trig,acts}:null;
+  const cn=x.cond&&CL[x.cond.type]?{type:x.cond.type,...(x.cond.val?{val:Math.min(99,Math.max(1,+x.cond.val))}:{})}:null;
+  return acts.length?{name:String(x.name||'Aturan baru').slice(0,40),trig,acts,...(cn?{cond:cn}:{})}:null;
 }
 async function sched(r){
   if(!LN)return;
@@ -680,7 +713,7 @@ async function sched(r){
     await LN.cancel({notifications:[0,1,2,3,4,5,6,7].map(k=>({id:r.id*8+k}))});
     const t=r.trig;if(!r.on||(t.type!=='waktu'&&t.type!=='sekali'))return;
     const p=await LN.requestPermissions();if(p.display==='denied'){toast('Izin notifikasi ditolak.');return}
-    const one=r.acts.length===1&&r.acts[0].type==='notif',body=one?(r.acts[0].val||r.name):'Ketuk untuk menjalankan aturan ini.';
+    const one=r.acts.length===1&&r.acts[0].type==='notif'&&!r.cond,body=one?(r.acts[0].val||r.name):'Ketuk untuk menjalankan aturan ini.';
     if(t.type==='sekali'){
       const at=new Date(t.at);if(isNaN(at)||at<=new Date()){toast('Waktunya sudah lewat.');return}
       await LN.schedule({notifications:[{id:r.id*8,title:r.name,body,extra:{rid:r.id},schedule:{at,allowWhileIdle:true}}]});return}
@@ -702,7 +735,9 @@ async function step(a,r){
   else if(a.type==='tunggu')await sleep(Math.min(300,Math.max(0,+v||0))*1000);
   else{if(!AL)throw new Error('hanya jalan di aplikasi Android');await AL.openUrl({url:v})}
 }
+async function okc(c){if(!DV)return true;try{const b=await DV.getBatteryInfo(),lv=Math.round((b.batteryLevel||0)*100);return c.type==='bl'?lv<c.val:c.type==='bg'?lv>c.val:c.type==='ch'?!!b.isCharging:!b.isCharging}catch(e){return true}}
 async function run(r){
+  if(r.cond&&!(await okc(r.cond))){log(r,'dilewati, syarat belum cocok');return}
   for(const a of r.acts){
     try{await step(a,r)}catch(e){const m=e&&e.message||e;toast('Gagal: '+m);log(r,'gagal di "'+ACT[a.type]+'", '+m);return}
   }
@@ -712,20 +747,22 @@ function fire(rid){
   const r=A.rules.find(x=>x.id===rid);if(!r)return;
   if(Date.now()-(lf[rid]||0)<10000)return;lf[rid]=Date.now();
   if(r.trig.type==='sekali'){r.on=false;saveA()}
-  if(r.acts.length===1&&r.acts[0].type==='notif')log(r,'notifikasi tampil');else run(r);
+  if(r.acts.length===1&&r.acts[0].type==='notif'&&!r.cond)log(r,'notifikasi tampil');else run(r);
 }
 if(LN){
   LN.addListener('localNotificationReceived',n=>fire(n.extra&&n.extra.rid));
   LN.addListener('localNotificationActionPerformed',e=>fire(e.notification&&e.notification.extra&&e.notification.extra.rid));
 }
+const ins={},dist=(a,b,c,d)=>{const p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,h=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return 12742e3*Math.asin(Math.sqrt(h))};
 async function tick(){
-  if(!DV)return;
-  const rs=A.rules.filter(r=>r.on&&['baterai','colok','cabut'].includes(r.trig.type));
-  if(!rs.length){lastChg=null;return}
-  try{const b=await DV.getBatteryInfo(),lv=Math.round((b.batteryLevel||0)*100),ch=!!b.isCharging,changed=lastChg!==null&&ch!==lastChg;lastChg=ch;
+  const on=A.rules.filter(r=>r.on),rs=on.filter(r=>['baterai','colok','cabut'].includes(r.trig.type)),lk=on.filter(r=>r.trig.type==='masuk'||r.trig.type==='keluar');
+  if(!rs.length)lastChg=null;
+  if(DV&&rs.length)try{const b=await DV.getBatteryInfo(),lv=Math.round((b.batteryLevel||0)*100),ch=!!b.isCharging,changed=lastChg!==null&&ch!==lastChg;lastChg=ch;
     rs.forEach(r=>{const t=r.trig.type;
       if(t==='baterai'){if(lv<r.trig.val){if(!hit[r.id]){hit[r.id]=1;run(r)}}else hit[r.id]=0}
       else if(changed&&(t==='colok')===ch)run(r)})}catch(e){}
+  if(GEO&&lk.length)try{const p=(await GEO.getCurrentPosition({enableHighAccuracy:false,timeout:15000})).coords;
+    lk.forEach(r=>{const t=r.trig,i=dist(p.latitude,p.longitude,t.lat,t.lng)<=t.r,was=ins[r.id];ins[r.id]=i;if(was!==undefined&&was!==i&&(t.type==='masuk')===i)run(r)})}catch(e){}
 }
 setInterval(tick,20000);setTimeout(tick,3000);
 
@@ -749,16 +786,16 @@ function renderA(){
     const d=document.createElement('div');d.className='rule glass';
     const t=document.createElement('div');t.className='rt';t.onclick=()=>openA(r.id);
     const b=document.createElement('b');b.textContent=r.name;
-    const sp=document.createElement('span');sp.textContent=sum(r);t.append(b,sp);
+    t.append(b);
     const tes=document.createElement('button');tes.className='mini';tes.textContent=r.trig.type==='manual'?'Jalankan':'Tes';tes.onclick=()=>run(r);
     const sw=document.createElement('label');sw.className='sw';
     const ck=document.createElement('input');ck.type='checkbox';ck.checked=!!r.on;
     ck.onchange=()=>{r.on=ck.checked;saveA();sched(r)};
-    sw.append(ck,document.createElement('i'));d.append(t,tes,sw);l.appendChild(d)});
+    sw.append(ck,document.createElement('i'));d.append(t,tes,sw,flow(r));l.appendChild(d)});
   renderApps();
   $('#aLog').textContent=A.log.length?A.log.map(x=>fmt(x.t)+'  '+x.s).join('\n'):'Belum ada riwayat.';
 }
-function setTrig(t){trigT=t;$('#aTrigSel').value=t;$('#rWaktu').hidden=t!=='waktu';$('#rSekali').hidden=t!=='sekali';$('#rBat').hidden=t!=='baterai'}
+function setTrig(t){trigT=t;$('#aTrigSel').value=t;$('#rWaktu').hidden=t!=='waktu';$('#rSekali').hidden=t!=='sekali';$('#rBat').hidden=t!=='baterai';$('#rLok').hidden=!(t==='masuk'||t==='keluar')}
 function drawDays(){
   const w=$('#aDays');w.textContent='';
   for(let d=1;d<=7;d++){const b=document.createElement('button');b.textContent=DN[d];b.className=days.includes(d)?'on':'';
@@ -790,7 +827,7 @@ function openA(id,pre){
   ed=id||0;
   const d=new Date(Date.now()+36e5);d.setMinutes(0,0,0);
   const r=id?A.rules.find(x=>x.id===id):(pre||{name:'',trig:{type:'waktu',time:'07:00',days:ALL},acts:[{type:'notif',val:''}]});
-  $('#aName').value=r.name;setTrig(r.trig.type);$('#aTime').value=r.trig.time||'07:00';$('#aBat').value=r.trig.val||20;
+  $('#aName').value=r.name;setTrig(r.trig.type);$('#aTime').value=r.trig.time||'07:00';$('#aBat').value=r.trig.val||20;lok=r.trig.lat!=null?{lat:r.trig.lat,lng:r.trig.lng}:null;$('#aLokR').value=r.trig.r||150;lokc();$('#aCond').value=(r.cond&&r.cond.type)||'';$('#aCV').value=(r.cond&&r.cond.val)||20;cv();
   $('#aSekali').value=r.trig.at||new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
   days=(r.trig.days||ALL).slice();drawDays();AC2=r.acts.map(a=>({...a}));drawActs();
   $('#aDel').hidden=!ed;$('#aTitle').textContent=ed?'Ubah aturan':'Aturan baru';document.body.classList.add('as');
@@ -802,12 +839,14 @@ $('#aSave').onclick=()=>{
   if(trigT==='waktu')trig={type:'waktu',time:$('#aTime').value||'07:00',days:(days.length?days:ALL).slice().sort((p,q)=>p-q)};
   else if(trigT==='sekali'){const at=$('#aSekali').value;if(!at||isNaN(new Date(at))){toast('Pilih tanggal dan jamnya dulu.');return}trig={type:'sekali',at}}
   else if(trigT==='baterai')trig={type:'baterai',val:Math.min(99,Math.max(1,+$('#aBat').value||20))};
+  else if(trigT==='masuk'||trigT==='keluar'){if(!lok){toast('Pilih lokasinya dulu.');return}trig={type:trigT,lat:lok.lat,lng:lok.lng,r:Math.min(5000,Math.max(50,+$('#aLokR').value||150))};if(GEO)GEO.requestPermissions().catch(()=>{})}
   else trig={type:trigT};
+  const cc=$('#aCond').value,cond=cc?{type:cc,...(cc==='bl'||cc==='bg'?{val:Math.min(99,Math.max(1,+$('#aCV').value||20))}:{})}:null;
   const acts=AC2.map(a=>({type:a.type,val:(a.val||'').trim(),...(a.type==='http'&&a.val2&&a.val2.trim()?{val2:a.val2.trim()}:{})}));
   if(!acts.length){toast('Tambah minimal satu aksi.');return}
   const bad=acts.find(a=>a.type!=='notif'&&!a.val);if(bad){toast('Isi aksi "'+ACT[bad.type]+'" dulu.');return}
   let r=ed&&A.rules.find(x=>x.id===ed);
-  if(r)Object.assign(r,{name,trig,acts});else{r={id:Date.now()%1e8,on:true,name,trig,acts};A.rules.push(r)}
+  if(r)Object.assign(r,{name,trig,acts,cond});else{r={id:Date.now()%1e8,on:true,name,trig,acts,cond};A.rules.push(r)}
   saveA();closeA();renderA();sched(r);
 };
 $('#aDel').onclick=()=>{const r=A.rules.find(x=>x.id===ed);if(!r)return;r.on=false;sched(r);A.rules=A.rules.filter(x=>x!==r);saveA();closeA();renderA()};
@@ -820,11 +859,12 @@ const TPL=[
   ['Baterai di bawah 20%',{name:'Baterai rendah',trig:{type:'baterai',val:20},acts:[{type:'notif',val:'Baterai di bawah 20%, colok charger.'},{type:'ucap',val:'Baterai tinggal sedikit'}]}],
   ['Charger dicabut',{name:'Charger dicabut',trig:{type:'cabut'},acts:[{type:'ucap',val:'Charger dicabut'}]}],
   ['Tombol buka WhatsApp',{name:'Buka WhatsApp',trig:{type:'manual'},acts:[{type:'app',val:'com.whatsapp'}]}],
-  ['Tombol buka SMS',{name:'Buka SMS',trig:{type:'manual'},acts:[{type:'app',val:'sms:'}]}]];
+  ['Tombol buka SMS',{name:'Buka SMS',trig:{type:'manual'},acts:[{type:'app',val:'sms:'}]}],
+  ['Ingatkan colok malam',{name:'Ingatkan colok charger',trig:{type:'waktu',time:'21:00',days:ALL},cond:{type:'bl',val:50},acts:[{type:'notif',val:'Baterai di bawah 50%, colok charger.'}]}]];
 TPL.forEach(([l,x])=>{const b=document.createElement('button');b.className='chip glass';b.textContent=l;b.onclick=()=>openA(0,x);$('#aTpl').appendChild(b)});
 
 async function ai(text){
-  const P='Ubah permintaan pengguna menjadi satu aturan otomatisasi HP. Balas HANYA JSON tanpa markdown: {"name":"nama singkat","trig":T,"acts":[aksi berurutan]}. T salah satu: {"type":"waktu","time":"HH:MM","days":[1-7, 1=Minggu, setiap hari=1,2,3,4,5,6,7]}, {"type":"sekali","at":"YYYY-MM-DDTHH:mm waktu lokal"}, {"type":"baterai","val":persen di bawah}, {"type":"colok"}, {"type":"cabut"}, {"type":"manual"}. Aksi: {"type":"notif|ucap|app|url|salin|bagi|http|tunggu","val":"pesan, kalimat, nama paket Android, tautan, teks, alamat webhook, atau jumlah detik","val2":"isi JSON untuk http, opsional"}. Sekarang: '+nowStr();
+  const P='Ubah permintaan pengguna menjadi satu aturan otomatisasi HP. Balas HANYA JSON tanpa markdown: {"name":"nama singkat","trig":T,"acts":[aksi berurutan]}. T salah satu: {"type":"waktu","time":"HH:MM","days":[1-7, 1=Minggu, setiap hari=1,2,3,4,5,6,7]}, {"type":"sekali","at":"YYYY-MM-DDTHH:mm waktu lokal"}, {"type":"baterai","val":persen di bawah}, {"type":"colok"}, {"type":"cabut"}, {"type":"manual"}. Boleh tambah "cond":{"type":"bl|bg|ch|nc","val":persen} (bl baterai di bawah, bg di atas, ch sedang dicas, nc tidak dicas). Aksi: {"type":"notif|ucap|app|url|salin|bagi|http|tunggu","val":"pesan, kalimat, nama paket Android, tautan, teks, alamat webhook, atau jumlah detik","val2":"isi JSON untuk http, opsional"}. Sekarang: '+nowStr();
   let txt;
   if(D.prov==='claude'){
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':D.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -854,6 +894,11 @@ $('#aImp').onclick=async()=>{
     saveA();renderA();toast(n+' aturan ditempel.')}
   catch(e){toast('Clipboard tidak berisi aturan yang valid.')}
 };
+let lok=null;
+function cv(){$('#rCV').hidden=!['bl','bg'].includes($('#aCond').value)}
+function lokc(){$('#aLokC').textContent=lok?'Tempat tersimpan: '+lok.lat.toFixed(4)+', '+lok.lng.toFixed(4):'Belum ada tempat. Berdirilah di tempatnya, lalu ketuk tombol di atas.'}
+$('#aCond').onchange=cv;
+$('#aLokNow').onclick=async()=>{if(!GEO){toast('Hanya jalan di aplikasi Android.');return}try{await GEO.requestPermissions();const p=(await GEO.getCurrentPosition({enableHighAccuracy:true,timeout:20000})).coords;lok={lat:p.latitude,lng:p.longitude};lokc()}catch(e){toast('Lokasi gagal: '+(e&&e.message||e))}};
 function tab(t){document.body.classList.toggle('at',t==='a');document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));if(t==='a')renderA()}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 renderA();
