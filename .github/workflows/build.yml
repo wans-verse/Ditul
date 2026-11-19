@@ -1,625 +1,470 @@
-name: Build APK Jarvis
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Jarvis</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:#0c1220; --line:#1b2840;
+    --txt:#dbe7ff; --dim:#6f86ad;
+    --blue:#3d8bff; --cyan:#62e6ff; --red:#ff5470; --green:#3ee38a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{
+    background:radial-gradient(120% 80% at 50% -10%,#12203a 0%,var(--bg) 55%);
+    color:var(--txt);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
 
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+  /* ===== ORB ===== */
+  .orb-wrap{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;padding:22px 0 10px}
+  .orb{
+    width:150px;height:150px;border-radius:50%;position:relative;
+    background:radial-gradient(circle at 36% 30%,#bfe4ff 0%,#4aa8ff 32%,#0a5cff 62%,#1a2a86 100%);
+    box-shadow:0 0 0 1px #1e4f9e inset,0 0 40px -6px #2f7bff,0 0 90px -20px #0a5cff;
+    transition:transform .18s ease, box-shadow .3s ease;
+    cursor:pointer;
+  }
+  .orb::after{
+    content:"";position:absolute;inset:-14px;border-radius:50%;
+    border:1px solid rgba(98,230,255,.18);
+    animation:breathe 3.4s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.07);opacity:.9}}
+  body.listening .orb{box-shadow:0 0 0 2px #2e8bff inset,0 0 60px 2px #2f7bff,0 0 130px -10px #0a5cff;animation:pulse .9s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  body.thinking .orb{background:radial-gradient(circle at 36% 30%,#d8f4ff 0%,#62e6ff 40%,#0a5cff 75%,#1a2a86 100%)}
+  body.speaking .orb{box-shadow:0 0 0 2px #62e6ff inset,0 0 70px 4px #2f7bff}
+  .orb-label{margin-top:14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  body.listening .orb-label{color:var(--cyan)}
+  body.thinking .orb-label{color:var(--blue)}
+  body.speaking .orb-label{color:var(--green)}
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  /* ===== CHAT ===== */
+  .chat{flex:1 1 auto;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+  .msg{max-width:86%;padding:10px 13px;border-radius:14px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+  .me{align-self:flex-end;background:linear-gradient(160deg,#1b3a6b,#12305c);border:1px solid #2a4d86;border-bottom-right-radius:4px}
+  .ai{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+  .sys{align-self:center;font-size:12px;color:var(--dim);background:transparent;border:1px dashed var(--line);padding:6px 10px}
+  .ai .tag{display:inline-block;font-size:10px;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase;margin-bottom:4px}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+  /* ===== INPUT ===== */
+  .bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(0deg,#05070d 70%,transparent);border-top:1px solid var(--line)}
+  .bar input{
+    flex:1;background:#0a101c;border:1px solid var(--line);color:var(--txt);
+    border-radius:12px;padding:12px 14px;font-size:15px;outline:none;
+  }
+  .bar input:focus{border-color:#2e6dff;box-shadow:0 0 0 3px rgba(46,109,255,.16)}
+  .btn{
+    border:0;border-radius:12px;padding:0 16px;height:46px;font-size:15px;font-weight:600;
+    background:linear-gradient(160deg,#3d8bff,#1b5fd6);color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .btn:active{transform:scale(.96)}
+  .btn.ghost{background:#0a101c;border:1px solid var(--line);color:var(--txt)}
+  .btn.mic{width:46px;padding:0;border-radius:50%}
+  body.listening .btn.mic{background:linear-gradient(160deg,#ff5470,#c21f3d);animation:pulse .9s infinite}
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
+  /* ===== SHEET ===== */
+  .sheet{
+    position:fixed;inset:0;background:rgba(3,6,12,.72);backdrop-filter:blur(6px);
+    display:none;align-items:flex-end;z-index:50;
+  }
+  .sheet.open{display:flex}
+  .sheet-body{
+    width:100%;max-height:82vh;overflow:auto;background:#080d17;border-top:1px solid var(--line);
+    border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .sheet h3{margin:0 0 14px;font-size:16px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #10192b;font-size:14px}
+  .row:last-child{border-bottom:0}
+  .row small{color:var(--dim);display:block;font-size:11.5px;margin-top:2px}
+  .pill{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--line);color:var(--dim)}
+  .pill.ok{color:var(--green);border-color:#1d5c3c;background:#0a1f16}
+  .pill.no{color:var(--red);border-color:#5c1d2a;background:#1f0a10}
+  .row button{border:1px solid var(--line);background:#0c1424;color:var(--txt);border-radius:9px;padding:7px 12px;font-size:12.5px;cursor:pointer}
 
-      - name: Siapkan proyek
-        run: |
-          mkdir -p www
-          cp index.html www/index.html
-          cat > package.json <<'EOF'
-          {
-            "name": "jarvis",
-            "version": "1.0.0",
-            "private": true,
-            "dependencies": {
-              "@capacitor/core": "^8.0.0",
-              "@capacitor/android": "^8.0.0",
-              "@capacitor/app-launcher": "^8.0.0",
-              "@capacitor/clipboard": "^8.0.0",
-              "@capacitor/device": "^8.0.0",
-              "@capacitor/geolocation": "^8.0.0",
-              "@capacitor/local-notifications": "^8.0.0",
-              "@capacitor/share": "^8.0.0",
-              "@capacitor-community/text-to-speech": "^8.0.0",
-              "@capgo/capacitor-speech-recognition": "^8.0.0"
-            },
-            "devDependencies": {
-              "@capacitor/cli": "^8.0.0",
-              "esbuild": "^0.25.0"
-            }
-          }
-          EOF
-          cat > plugins.src.js <<'EOF'
-          import { Capacitor, registerPlugin } from '@capacitor/core';
-          import { SpeechRecognition } from '@capgo/capacitor-speech-recognition';
-          import { TextToSpeech } from '@capacitor-community/text-to-speech';
-          import { AppLauncher } from '@capacitor/app-launcher';
-          import { LocalNotifications } from '@capacitor/local-notifications';
-          import { Device } from '@capacitor/device';
-          import { Geolocation } from '@capacitor/geolocation';
-          import { Clipboard } from '@capacitor/clipboard';
-          import { Share } from '@capacitor/share';
-          window.JV = {
-            native: Capacitor.isNativePlatform(),
-            SR: SpeechRecognition, TTS: TextToSpeech, AL: AppLauncher, LN: LocalNotifications,
-            DV: Device, GEO: Geolocation, CB: Clipboard, SH: Share,
-            KA: registerPlugin('KeepAlive')
-          };
-          EOF
-          cat > capacitor.config.json <<'EOF'
-          {
-            "appId": "com.jarvis.agent",
-            "appName": "Jarvis",
-            "webDir": "www",
-            "server": { "androidScheme": "https" },
-            "plugins": { "CapacitorHttp": { "enabled": true } }
-          }
-          EOF
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:#0c1424;border:1px solid var(--line);padding:9px 16px;border-radius:20px;font-size:13px;
+    transition:.25s;pointer-events:none;z-index:99;max-width:88vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-      - name: Pasang dependensi dan buat proyek Android
-        run: |
-          npm install --no-audit --no-fund
-          npx esbuild plugins.src.js --bundle --minify --format=iife --outfile=www/plugins.js
-          npx cap add android
+  /* app list */
+  .applist{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}
+  .appitem{background:#0c1424;border:1px solid var(--line);border-radius:12px;padding:12px 8px;text-align:center;font-size:12px;cursor:pointer;overflow:hidden}
+  .appitem b{display:block;font-size:20px;margin-bottom:6px;color:var(--cyan)}
+  .appitem span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
 
-      - name: Izin, ikon, dan pengaturan keyboard
-        run: |
-          python3 - <<'PY'
-          import os, re
+<!-- ORB -->
+<div class="orb-wrap">
+  <div class="orb" id="orb"></div>
+  <div class="orb-label" id="orbLabel">Ketuk untuk bicara</div>
+</div>
 
-          p = 'android/app/src/main/AndroidManifest.xml'
-          with open(p, 'r', encoding='utf-8') as f:
-              s = f.read()
+<!-- CHAT -->
+<div class="chat" id="chat">
+  <div class="msg sys">Jarvis v1 · native siap</div>
+</div>
 
-          add = """
-              <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-              <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-              <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
-              <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
-              <uses-permission android:name="android.permission.WAKE_LOCK"/>
-              <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
-              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-              <queries>
-                  <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
-                  <intent><action android:name="android.speech.RecognitionService"/></intent>
-              </queries>
-          """
-          s = s.replace('</manifest>', add + '</manifest>')
+<!-- INPUT -->
+<div class="bar">
+  <button class="btn ghost" id="menuBtn" title="Pengaturan">⚙</button>
+  <input id="input" placeholder="Ketik perintah…" autocomplete="off">
+  <button class="btn mic" id="micBtn" title="Bicara">🎙</button>
+</div>
 
-          svc = """
-                  <service android:name=".KeepAliveService" android:exported="false" android:foregroundServiceType="specialUse">
-                      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="otomasi latar belakang"/>
-                  </service>
-                  <activity android:name=".VoiceActivity" android:theme="@style/VoiceTheme" android:taskAffinity="" android:excludeFromRecents="true" android:exported="false" android:launchMode="singleTask" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"/>
-                  <receiver android:name=".VoiceWidget" android:label="Jarvis Suara" android:exported="false">
-                      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
-                      <meta-data android:name="android.appwidget.provider" android:resource="@xml/voice_widget_info"/>
-                  </receiver>
-              """
-          s = s.replace('</application>', svc + '</application>')
+<!-- SHEET PENGATURAN -->
+<div class="sheet" id="sheet">
+  <div class="sheet-body">
+    <h3>Status & Pengaturan</h3>
+    <div id="statusList"></div>
+    <div style="height:12px"></div>
+    <div class="row"><span>Layanan latar belakang</span>
+      <div><button id="kaStart">Mulai</button> <button id="kaStop">Stop</button></div>
+    </div>
+    <div class="row"><span>Senter<small>Toggle on/off</small></span><button id="torchBtn">Toggle</button></div>
+    <div class="row"><span>Volume media</span>
+      <div><button data-vol="-10">−</button> <button data-vol="+10">+</button></div>
+    </div>
+    <div class="row"><span>Daftar aplikasi</span><button id="appsBtn">Buka</button></div>
+    <div class="row"><span>Bagikan teks</span><button id="shareBtn">Bagikan</button></div>
+    <div class="row"><span>Salin ke clipboard</span><button id="copyBtn">Salin</button></div>
+    <div style="height:8px"></div>
+    <button class="btn ghost" id="closeSheet" style="width:100%;height:44px">Tutup</button>
+  </div>
+</div>
 
-          if 'windowSoftInputMode' in s:
-              s = re.sub(r'android:windowSoftInputMode="[^"]*"', 'android:windowSoftInputMode="adjustResize"', s)
-          else:
-              s = s.replace('<activity', '<activity android:windowSoftInputMode="adjustResize"', 1)
+<div class="toast" id="toast"></div>
 
-          with open(p, 'w', encoding='utf-8') as f:
-              f.write(s)
+<script src="plugins.js"></script>
+<script>
+/* =========================================================
+   JARVIS CORE
+   ========================================================= */
+const JV = window.JV || {};
+const $ = s => document.querySelector(s);
+const chat = $('#chat'), input = $('#input'), orb = $('#orb'), orbLabel = $('#orbLabel');
+let mode = 'idle'; // idle | listening | thinking | speaking
 
-          r = 'android/app/src/main/res/'
-          os.makedirs(r + 'drawable', exist_ok=True)
-          os.makedirs(r + 'values', exist_ok=True)
-          os.makedirs(r + 'mipmap-anydpi-v26', exist_ok=True)
+function setMode(m){
+  mode = m;
+  document.body.classList.remove('listening','thinking','speaking');
+  if(m!=='idle') document.body.classList.add(m);
+  orbLabel.textContent = {
+    idle:'Ketuk untuk bicara', listening:'Mendengarkan…',
+    thinking:'Berpikir…', speaking:'Berbicara…'
+  }[m];
+}
+function toast(t){
+  const el=$('#toast'); el.textContent=t; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2200);
+}
+function addMsg(text, who='ai'){
+  const d=document.createElement('div');
+  d.className='msg '+who;
+  if(who==='ai') d.innerHTML='<span class="tag">Jarvis</span>'+escapeHtml(text);
+  else d.textContent=text;
+  chat.appendChild(d); chat.scrollTop=chat.scrollHeight;
+  return d;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-          fg_content = """<?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:aapt="http://schemas.android.com/aapt"
-              android:width="108dp" android:height="108dp"
-              android:viewportWidth="108" android:viewportHeight="108">
-              <path android:pathData="M54,54m-23,0a23,23 0,1 1,46 0a23,23 0,1 1,-46 0">
-                  <aapt:attr name="android:fillColor">
-                      <gradient android:type="radial" android:centerX="46" android:centerY="44" android:gradientRadius="34">
-                          <item android:offset="0" android:color="#FFD4ECFF"/>
-                          <item android:offset="0.35" android:color="#FF4AA8FF"/>
-                          <item android:offset="0.7" android:color="#FF0A5CFF"/>
-                          <item android:offset="1" android:color="#FF1A2A86"/>
-                      </gradient>
-                  </aapt:attr>
-              </path>
-          </vector>"""
-          with open(r + 'drawable/jarvis_fg.xml', 'w', encoding='utf-8') as f:
-              f.write(fg_content)
+/* =========================================================
+   TTS — Text to Speech
+   ========================================================= */
+async function speak(text){
+  addMsg(text,'ai');
+  if(!JV.native || !JV.TTS){
+    // fallback browser
+    try{
+      const u=new SpeechSynthesisUtterance(text); u.lang='id-ID';
+      speechSynthesis.speak(u); setMode('speaking');
+      u.onend=()=>setMode('idle');
+    }catch{ setMode('idle'); }
+    return;
+  }
+  try{
+    setMode('speaking');
+    await JV.TTS.speak({ text, lang:'id-ID', rate:1.0, pitch:1.0, volume:1.0 });
+  }catch(e){ console.warn('TTS', e); }
+  setMode('idle');
+}
 
-          with open(r + 'values/ic_launcher_background.xml', 'w', encoding='utf-8') as f:
-              f.write('<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#05070D</color></resources>')
+/* =========================================================
+   ASR — Speech Recognition
+   ========================================================= */
+let listening = false;
+async function startListen(){
+  if(listening) return;
+  if(!JV.native || !JV.SR){
+    toast('Speech recognition hanya di APK');
+    return;
+  }
+  try{
+    const perm = await JV.SR.checkPermissions();
+    if(perm.speechRecognition!=='granted'){
+      const req = await JV.SR.requestPermissions();
+      if(req.speechRecognition!=='granted'){ toast('Izin mikrofon ditolak'); return; }
+    }
+  }catch(e){ /* lanjut coba */ }
 
-          icon = '<?xml version="1.0" encoding="utf-8"?><adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/ic_launcher_background"/><foreground android:drawable="@drawable/jarvis_fg"/></adaptive-icon>'
-          for n in ('ic_launcher', 'ic_launcher_round'):
-              with open(r + 'mipmap-anydpi-v26/' + n + '.xml', 'w', encoding='utf-8') as f:
-                  f.write(icon)
+  listening = true; setMode('listening');
+  try{
+    await JV.SR.start({
+      language:'id-ID',
+      maxResults:1,
+      partialResults:false,
+      popup:false
+    });
+  }catch(e){
+    listening=false; setMode('idle');
+    toast('Gagal mulai mikrofon: '+(e.message||e));
+  }
+}
+async function stopListen(){
+  if(!listening) return;
+  listening=false;
+  try{ await JV.SR.stop(); }catch{}
+  setMode('idle');
+}
 
-          os.makedirs(r + 'layout', exist_ok=True)
-          os.makedirs(r + 'xml', exist_ok=True)
+/* pasang listener SR */
+if(JV.native && JV.SR){
+  JV.SR.addListener('partialResults', ev=>{
+    const t = (ev.matches && ev.matches[0]) || '';
+    if(t) orbLabel.textContent = t.slice(0,40);
+  });
+  JV.SR.addListener('listeningState', ev=>{
+    if(ev.state==='stopped'){ listening=false; if(mode==='listening') setMode('idle'); }
+  });
+  JV.SR.addListener('results', ev=>{
+    const t = (ev.matches && ev.matches[0]) || '';
+    listening=false; setMode('idle');
+    if(t) handleUser(t);
+  });
+}
 
-          with open(r + 'values/voice_theme.xml', 'w', encoding='utf-8') as f:
-              f.write("""<?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="VoiceTheme" parent="Theme.AppCompat.NoActionBar">
-                  <item name="android:windowIsTranslucent">true</item>
-                  <item name="android:windowBackground">@android:color/transparent</item>
-                  <item name="android:backgroundDimEnabled">false</item>
-                  <item name="android:windowAnimationStyle">@null</item>
-                  <item name="android:windowNoTitle">true</item>
-                  <item name="android:windowContentTransitions">false</item>
-              </style>
-          </resources>""")
+/* =========================================================
+   INPUT — teks & suara
+   ========================================================= */
+function handleUser(text){
+  text = text.trim(); if(!text) return;
+  addMsg(text,'me');
+  route(text);
+}
 
-          with open(r + 'drawable/widget_orb.xml', 'w', encoding='utf-8') as f:
-              f.write("""<?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-              <gradient android:type="radial" android:centerX="0.35" android:centerY="0.3" android:gradientRadius="60dp"
-                  android:startColor="#FF9AD2FF" android:centerColor="#FF2E8CFF" android:endColor="#FF0A3FCF"/>
-          </shape>""")
+$('#input').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ const v=input.value; input.value=''; handleUser(v); }
+});
+$('#micBtn').onclick = ()=> listening ? stopListen() : startListen();
+orb.onclick = ()=> listening ? stopListen() : startListen();
 
-          with open(r + 'layout/widget_voice.xml', 'w', encoding='utf-8') as f:
-              f.write('<?xml version="1.0" encoding="utf-8"?>\n'
-                  '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/vw_root" '
-                  'android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center">'
-                  '<FrameLayout android:layout_width="84dp" android:layout_height="84dp">'
-                  '<ImageView android:id="@+id/vw_ring" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:src="@drawable/widget_ring_0" android:visibility="invisible"/>'
-                  '<ImageView android:layout_width="64dp" android:layout_height="64dp" android:layout_gravity="center" android:src="@drawable/widget_orb" android:contentDescription="Bicara"/>'
-                  '</FrameLayout>'
-                  '<TextView android:id="@+id/vw_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="Bicara" '
-                  'android:textColor="#FFFFFFFF" android:textSize="13sp" android:shadowColor="#CC000000" android:shadowRadius="6" android:shadowDx="0" android:shadowDy="1"/>'
-                  '</LinearLayout>')
+/* event dari widget / MainActivity */
+window.addEventListener('jv-voice', ()=>{
+  // cek pending voice dari plugin
+  if(JV.native && JV.KA && JV.KA.pending){
+    JV.KA.pending().then(r=>{ if(r.v) startListen(); });
+  } else {
+    startListen();
+  }
+});
 
-          for k in range(8):
-              t = k / 7.0
-              p = int(round(3 + 9 * (1 - t)))
-              a = int(round(230 * (1 - t)))
-              with open(r + 'drawable/widget_ring_%d.xml' % k, 'w', encoding='utf-8') as f:
-                  f.write('<?xml version="1.0" encoding="utf-8"?>'
-                      '<inset xmlns:android="http://schemas.android.com/apk/res/android" '
-                      'android:insetLeft="%d%%" android:insetTop="%d%%" android:insetRight="%d%%" android:insetBottom="%d%%">'
-                      '<shape android:shape="oval"><stroke android:width="3dp" android:color="#%02X4AA8FF"/><solid android:color="#00000000"/></shape>'
-                      '</inset>' % (p, p, p, p, a))
+/* =========================================================
+   ROUTER PERINTAH (rule-based sederhana, mudah ditambah)
+   ========================================================= */
+async function route(raw){
+  const t = raw.toLowerCase();
+  setMode('thinking');
 
-          with open(r + 'xml/voice_widget_info.xml', 'w', encoding='utf-8') as f:
-              f.write("""<?xml version="1.0" encoding="utf-8"?>
-          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-              android:minWidth="110dp" android:minHeight="110dp"
-              android:targetCellWidth="2" android:targetCellHeight="2"
-              android:updatePeriodMillis="0"
-              android:initialLayout="@layout/widget_voice"
-              android:resizeMode="none"
-              android:widgetCategory="home_screen"/>""")
-          PY
+  /* ---- senter ---- */
+  if(/\b(senter|lampu|flash|torch)\b/.test(t)){
+    if(!JV.native){ setMode('idle'); return speak('Senter hanya bisa di APK.'); }
+    const on = /\b(on|nyala|hidupkan|aktifkan)\b/.test(t);
+    const off= /\b(off|mati|matikan)\b/.test(t);
+    const m = on?'on':off?'off':'toggle';
+    try{
+      const r = await JV.KA.torch({mode:m});
+      setMode('idle'); return speak(r.on?'Senter dinyalakan.':'Senter dimatikan.');
+    }catch(e){ setMode('idle'); return speak('Senter gagal: '+e.message); }
+  }
 
-      - name: Kode native latar belakang
-        run: |
-          D=android/app/src/main/java/com/jarvis/agent
-          mkdir -p $D
-          cat > $D/MainActivity.java <<'EOF'
-          package com.jarvis.agent;
+  /* ---- volume ---- */
+  if(/\b(volume|suara)\b/.test(t)){
+    if(!JV.native){ setMode('idle'); return speak('Volume hanya bisa di APK.'); }
+    const up = /\b(naik|besar|tinggi|tambah)\b/.test(t);
+    const dn = /\b(turun|kecil|pelan|kurang)\b/.test(t);
+    const pct = t.match(/(\d{1,3})\s*(%|persen)/);
+    try{
+      let args={jenis:'media'};
+      if(pct) args.persen=parseInt(pct[1]);
+      else if(up) args.ubah=10;
+      else if(dn) args.ubah=-10;
+      const r = await JV.KA.volume(args);
+      setMode('idle'); return speak('Volume sekarang '+r.persen+' persen.');
+    }catch(e){ setMode('idle'); return speak('Gagal ubah volume: '+e.message); }
+  }
 
-          import android.content.Intent;
-          import android.os.Bundle;
-          import com.getcapacitor.BridgeActivity;
+  /* ---- buka app ---- */
+  if(/^(buka|open|jalankan|launch)\s+(.+)/.test(t)){
+    const name = raw.replace(/^(buka|open|jalankan|launch)\s+/i,'').trim();
+    if(!JV.native){ setMode('idle'); return speak('Buka aplikasi hanya bisa di APK.'); }
+    try{
+      const r = await JV.KA.apps();
+      const hit = r.apps.find(a=> a.n.toLowerCase().includes(name.toLowerCase()) || a.v.toLowerCase().includes(name.toLowerCase()));
+      if(!hit){ setMode('idle'); return speak('Aplikasi "'+name+'" tidak ditemukan.'); }
+      await JV.AL.openUrl({url:hit.v});
+      setMode('idle'); return speak('Membuka '+hit.n+'.');
+    }catch(e){ setMode('idle'); return speak('Gagal buka aplikasi: '+e.message); }
+  }
 
-          public class MainActivity extends BridgeActivity {
-            static boolean pendingVoice = false;
+  /* ---- lokasi ---- */
+  if(/\b(lokasi|posisi|gps|dimana|di mana)\b/.test(t)){
+    if(!JV.native){ setMode('idle'); return speak('Lokasi hanya bisa di APK.'); }
+    try{
+      const p = await JV.GEO.getCurrentPosition({enableHighAccuracy:true,timeout:15000});
+      const lat=p.coords.latitude.toFixed(5), lon=p.coords.longitude.toFixed(5);
+      setMode('idle');
+      return speak('Lokasi Anda '+lat+', '+lon+'. Membuka peta.');
+    }catch(e){ setMode('idle'); return speak('Gagal ambil lokasi: '+e.message); }
+  }
 
-            @Override
-            public void onCreate(Bundle savedInstanceState) {
-              android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
-              cm.setAcceptCookie(true);
-              cm.setCookie("https://localhost", "jvmode=main; path=/");
-              cm.flush();
-              registerPlugin(KeepAlivePlugin.class);
-              super.onCreate(savedInstanceState);
-              if (getBridge() != null && getBridge().getWebView() != null) {
-                getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
-              }
-              check(getIntent(), false);
-            }
+  /* ---- info perangkat ---- */
+  if(/\b(perangkat|device|hp|baterai|battery)\b/.test(t)){
+    if(!JV.native){ setMode('idle'); return speak('Info perangkat hanya di APK.'); }
+    try{
+      const info = await JV.DV.getInfo();
+      const bat = await JV.DV.getBatteryInfo();
+      setMode('idle');
+      return speak('Perangkat '+info.model+', Android '+info.osVersion+', baterai '+Math.round(bat.batteryLevel*100)+' persen.');
+    }catch(e){ setMode('idle'); return speak('Gagal baca perangkat: '+e.message); }
+  }
 
-            @Override
-            protected void onNewIntent(Intent intent) {
-              super.onNewIntent(intent);
-              setIntent(intent);
-              check(intent, true);
-            }
+  /* ---- salin ---- */
+  if(/^(salin|copy)\s+(.+)/.test(t)){
+    const text = raw.replace(/^(salin|copy)\s+/i,'');
+    try{
+      if(JV.native && JV.CB) await JV.CB.write({string:text});
+      else await navigator.clipboard.writeText(text);
+      setMode('idle'); return speak('Sudah disalin.');
+    }catch(e){ setMode('idle'); return speak('Gagal salin: '+e.message); }
+  }
 
-            private void check(Intent i, boolean warm) {
-              if (i != null && i.getBooleanExtra("suara", false)) {
-                i.removeExtra("suara");
-                pendingVoice = true;
-                if (warm && getBridge() != null && getBridge().getWebView() != null) {
-                  getBridge().getWebView().post(() ->
-                    getBridge().getWebView().evaluateJavascript("window.dispatchEvent(new Event('jv-voice'))", null));
-                }
-              }
-            }
-          }
-          EOF
-          cat > $D/KeepAliveService.java <<'EOF'
-          package com.jarvis.agent;
+  /* ---- bagikan ---- */
+  if(/^(bagikan|share)\s+(.+)/.test(t)){
+    const text = raw.replace(/^(bagikan|share)\s+/i,'');
+    try{
+      if(JV.native && JV.SH) await JV.SH.share({title:'Jarvis', text});
+      else if(navigator.share) await navigator.share({text});
+      else { toast('Share tidak didukung'); }
+      setMode('idle'); return speak('Siap dibagikan.');
+    }catch(e){ setMode('idle'); return speak('Gagal bagikan: '+e.message); }
+  }
 
-          import android.app.Notification;
-          import android.app.NotificationChannel;
-          import android.app.NotificationManager;
-          import android.app.PendingIntent;
-          import android.app.Service;
-          import android.content.Intent;
-          import android.content.pm.ServiceInfo;
-          import android.os.Build;
-          import android.os.IBinder;
-          import android.os.PowerManager;
+  /* ---- notifikasi ---- */
+  if(/\b(notif|notifikasi|ingatkan|reminder)\b/.test(t)){
+    if(!JV.native){ setMode('idle'); return speak('Notifikasi hanya di APK.'); }
+    try{
+      const perm = await JV.LN.checkPermissions();
+      if(perm.display!=='granted') await JV.LN.requestPermissions();
+      await JV.LN.schedule({
+        notifications:[{
+          title:'Jarvis', body: raw, id: Date.now()%100000,
+          schedule:{ at: new Date(Date.now()+5000) }
+        }]
+      });
+      setMode('idle'); return speak('Notifikasi dijadwalkan 5 detik lagi.');
+    }catch(e){ setMode('idle'); return speak('Gagal jadwalkan notifikasi: '+e.message); }
+  }
 
-          public class KeepAliveService extends Service {
-            private PowerManager.WakeLock wl;
+  /* ---- layanan latar belakang ---- */
+  if(/\b(latar|background|keep\s*alive|layanan)\b/.test(t)){
+    if(!JV.native){ setMode('idle'); return speak('Layanan latar hanya di APK.'); }
+    try{
+      if(/\b(stop|mati|hentikan)\b/.test(t)) await JV.KA.stop();
+      else await JV.KA.start();
+      setMode('idle'); return speak('Layanan latar diperbarui.');
+    }catch(e){ setMode('idle'); return speak('Gagal: '+e.message); }
+  }
 
-            @Override
-            public IBinder onBind(Intent i) { return null; }
+  /* ---- default: echo + bantuan ---- */
+  setMode('idle');
+  speak('Saya mendengar: '+raw+'. Coba perintah: senter, volume, buka aplikasi, lokasi, info perangkat, salin, bagikan, notifikasi, atau latar belakang.');
+}
 
-            @Override
-            public int onStartCommand(Intent intent, int flags, int startId) {
-              try {
-                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                Notification.Builder b;
-                if (Build.VERSION.SDK_INT >= 26) {
-                  nm.createNotificationChannel(new NotificationChannel("jarvis_bg", "Jarvis aktif", NotificationManager.IMPORTANCE_LOW));
-                  b = new Notification.Builder(this, "jarvis_bg");
-                } else {
-                  b = new Notification.Builder(this);
-                }
-                PendingIntent pi = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
-                Notification n = b.setContentTitle("Jarvis aktif")
-                  .setContentText("Otomasi berjalan di latar belakang")
-                  .setSmallIcon(android.R.drawable.ic_dialog_info)
-                  .setContentIntent(pi)
-                  .setOngoing(true)
-                  .build();
-                if (Build.VERSION.SDK_INT >= 34) {
-                  startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-                } else {
-                  startForeground(1, n);
-                }
-                if (wl == null) {
-                  PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-                  wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jarvis:ka");
-                  wl.acquire();
-                }
-              } catch (Exception e) {
-                stopSelf();
-              }
-              return START_STICKY;
-            }
+/* =========================================================
+   PANEL PENGATURAN
+   ========================================================= */
+$('#menuBtn').onclick = async ()=>{
+  $('#sheet').classList.add('open');
+  if(JV.native && JV.KA && JV.KA.status){
+    try{
+      const s = await JV.KA.status();
+      $('#statusList').innerHTML = `
+        <div class="row"><span>Izin baterai<small>Jangan optimasi</small></span><span class="pill ${s.battery?'ok':'no'}">${s.battery?'AKTIF':'BELUM'}</span></div>
+        <div class="row"><span>Overlay<small>Izin tampil di atas</small></span><span class="pill ${s.overlay?'ok':'no'}">${s.overlay?'AKTIF':'BELUM'}</span></div>
+        <div class="row"><span>Alarm tepat<small>Untuk notifikasi presisi</small></span><span class="pill ${s.exact?'ok':'no'}">${s.exact?'AKTIF':'BELUM'}</span></div>
+        <div class="row"><span>Lokasi latar<small>Izin background</small></span><span class="pill ${s.bgloc?'ok':'no'}">${s.bgloc?'AKTIF':'BELUM'}</span></div>
+      `;
+    }catch(e){ $('#statusList').innerHTML='<div class="msg sys">Gagal baca status</div>'; }
+  } else {
+    $('#statusList').innerHTML='<div class="msg sys">Mode web — plugin native tidak aktif</div>';
+  }
+};
+$('#closeSheet').onclick = ()=> $('#sheet').classList.remove('open');
+$('#sheet').addEventListener('click', e=>{ if(e.target.id==='sheet') $('#sheet').classList.remove('open'); });
 
-            @Override
-            public void onDestroy() {
-              if (wl != null && wl.isHeld()) wl.release();
-              super.onDestroy();
-            }
-          }
-          EOF
-          cat > $D/KeepAlivePlugin.java <<'EOF'
-          package com.jarvis.agent;
+$('#kaStart').onclick = ()=> JV.KA?.start?.().then(()=>toast('Layanan dimulai')).catch(e=>toast(e.message));
+$('#kaStop').onclick  = ()=> JV.KA?.stop?.().then(()=>toast('Layanan dihentikan')).catch(e=>toast(e.message));
+$('#torchBtn').onclick= ()=> JV.KA?.torch?.({mode:'toggle'}).then(r=>toast('Senter '+(r.on?'ON':'OFF'))).catch(e=>toast(e.message));
+document.querySelectorAll('[data-vol]').forEach(b=>{
+  b.onclick = ()=> JV.KA?.volume?.({jenis:'media', ubah:parseInt(b.dataset.vol)}).then(r=>toast('Volume '+r.persen+'%')).catch(e=>toast(e.message));
+});
+$('#shareBtn').onclick = ()=> {
+  const t = chat.lastElementChild?.textContent || 'Jarvis';
+  if(JV.SH) JV.SH.share({title:'Jarvis', text:t}); else navigator.share?.({text:t});
+};
+$('#copyBtn').onclick = async ()=>{
+  const t = chat.lastElementChild?.textContent || '';
+  try{ if(JV.CB) await JV.CB.write({string:t}); else await navigator.clipboard.writeText(t); toast('Disalin'); }
+  catch(e){ toast('Gagal: '+e.message); }
+};
+$('#appsBtn').onclick = async ()=>{
+  if(!JV.KA?.apps){ toast('Hanya di APK'); return; }
+  try{
+    const r = await JV.KA.apps();
+    const wrap = document.createElement('div');
+    wrap.className='applist';
+    r.apps.slice(0,60).forEach(a=>{
+      const b=document.createElement('div');
+      b.className='appitem';
+      b.innerHTML='<b>▦</b><span>'+escapeHtml(a.n)+'</span>';
+      b.onclick=()=>{ JV.AL.openUrl({url:a.v}).catch(e=>toast(e.message)); };
+      wrap.appendChild(b);
+    });
+    const body=$('.sheet-body'); body.querySelector('.applist')?.remove(); body.appendChild(wrap);
+  }catch(e){ toast(e.message); }
+};
 
-          import android.content.Intent;
-          import android.app.AlarmManager;
-          import android.hardware.camera2.CameraCharacteristics;
-          import android.hardware.camera2.CameraManager;
-          import android.media.AudioManager;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.content.Context;
-          import android.content.pm.PackageManager;
-          import android.os.PowerManager;
-          import android.content.pm.ResolveInfo;
-          import android.net.Uri;
-          import android.os.Build;
-          import android.provider.Settings;
-          import com.getcapacitor.JSArray;
-          import com.getcapacitor.JSObject;
-          import com.getcapacitor.Plugin;
-          import com.getcapacitor.PluginCall;
-          import com.getcapacitor.PluginMethod;
-          import com.getcapacitor.annotation.CapacitorPlugin;
-
-          @CapacitorPlugin(name = "KeepAlive")
-          public class KeepAlivePlugin extends Plugin {
-            @PluginMethod
-            public void start(PluginCall call) {
-              Intent i = new Intent(getContext(), KeepAliveService.class);
-              if (Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(i);
-              else getContext().startService(i);
-              call.resolve();
-            }
-
-            @PluginMethod
-            public void stop(PluginCall call) {
-              getContext().stopService(new Intent(getContext(), KeepAliveService.class));
-              call.resolve();
-            }
-
-            @PluginMethod
-            public void battery(PluginCall call) {
-              go(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName())));
-              call.resolve();
-            }
-
-            @PluginMethod
-            public void overlay(PluginCall call) {
-              go(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName())));
-              call.resolve();
-            }
-
-            @PluginMethod
-            public void apps(PluginCall call) {
-              PackageManager pm = getContext().getPackageManager();
-              Intent q = new Intent(Intent.ACTION_MAIN);
-              q.addCategory(Intent.CATEGORY_LAUNCHER);
-              JSArray arr = new JSArray();
-              for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
-                JSObject o = new JSObject();
-                o.put("n", ri.loadLabel(pm).toString());
-                o.put("v", ri.activityInfo.packageName);
-                arr.put(o);
-              }
-              JSObject res = new JSObject();
-              res.put("apps", arr);
-              call.resolve(res);
-            }
-
-          @PluginMethod
-          public void close(PluginCall call) {
-            call.resolve();
-            if (getActivity() != null) getActivity().finish();
-          }
-
-          @PluginMethod
-          public void pending(PluginCall call) {
-            JSObject o = new JSObject();
-            o.put("v", MainActivity.pendingVoice);
-            MainActivity.pendingVoice = false;
-            call.resolve(o);
-          }
-
-          @PluginMethod
-          public void status(PluginCall call) {
-            Context c = getContext();
-            PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
-            boolean ex = true;
-            if (Build.VERSION.SDK_INT >= 31) {
-              AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
-              ex = am.canScheduleExactAlarms();
-            }
-            JSObject o = new JSObject();
-            o.put("battery", pm.isIgnoringBatteryOptimizations(c.getPackageName()));
-            o.put("overlay", Settings.canDrawOverlays(c));
-            o.put("exact", ex);
-            call.resolve(o);
-          }
-
-          @PluginMethod
-          public void exact(PluginCall call) {
-            if (Build.VERSION.SDK_INT >= 31) {
-              go(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getContext().getPackageName())));
-            }
-            call.resolve();
-          }
-
-          static boolean torchOn = false;
-          static boolean torchCb = false;
-
-          @PluginMethod
-          public void torch(PluginCall call) {
-            try {
-              CameraManager cm = (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
-              if (!torchCb) {
-                torchCb = true;
-                cm.registerTorchCallback(new CameraManager.TorchCallback() {
-                  @Override
-                  public void onTorchModeChanged(String id, boolean enabled) { torchOn = enabled; }
-                }, new Handler(Looper.getMainLooper()));
-              }
-              String id = null;
-              for (String cid : cm.getCameraIdList()) {
-                CameraCharacteristics ch = cm.getCameraCharacteristics(cid);
-                Boolean fl = ch.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
-                Integer face = ch.get(CameraCharacteristics.LENS_FACING);
-                if (fl != null && fl && face != null && face == CameraCharacteristics.LENS_FACING_BACK) { id = cid; break; }
-              }
-              if (id == null) { call.reject("HP ini tidak punya senter"); return; }
-              String mode = call.getString("mode", "toggle");
-              boolean want = "on".equals(mode) ? true : ("off".equals(mode) ? false : !torchOn);
-              cm.setTorchMode(id, want);
-              torchOn = want;
-              JSObject o = new JSObject();
-              o.put("on", want);
-              call.resolve(o);
-            } catch (Exception e) {
-              call.reject("Senter gagal: " + e.getMessage());
-            }
-          }
-
-          @PluginMethod
-          public void volume(PluginCall call) {
-            try {
-              AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
-              String j = call.getString("jenis", "media");
-              int st = AudioManager.STREAM_MUSIC;
-              if ("dering".equals(j)) st = AudioManager.STREAM_RING;
-              else if ("alarm".equals(j)) st = AudioManager.STREAM_ALARM;
-              else if ("notifikasi".equals(j)) st = AudioManager.STREAM_NOTIFICATION;
-              else if ("panggilan".equals(j)) st = AudioManager.STREAM_VOICE_CALL;
-              int max = am.getStreamMaxVolume(st);
-              int cur = am.getStreamVolume(st);
-              Integer lv = call.getInt("persen");
-              Integer dl = call.getInt("ubah");
-              int target = cur;
-              if (lv != null) {
-                target = Math.round(lv * max / 100f);
-              } else if (dl != null) {
-                int step = Math.round(dl * max / 100f);
-                if (step == 0 && dl != 0) step = dl > 0 ? 1 : -1;
-                target = cur + step;
-              }
-              target = Math.max(0, Math.min(max, target));
-              if (target != cur) am.setStreamVolume(st, target, AudioManager.FLAG_SHOW_UI);
-              JSObject o = new JSObject();
-              o.put("persen", Math.round(am.getStreamVolume(st) * 100f / max));
-              call.resolve(o);
-            } catch (SecurityException e) {
-              call.reject("Volume ini butuh izin Jangan Ganggu di pengaturan HP");
-            } catch (Exception e) {
-              call.reject("Volume gagal: " + e.getMessage());
-            }
-          }
-
-          private void go(Intent i) {
-              i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-              getContext().startActivity(i);
-            }
-          }
-          EOF
-
-          cat > $D/VoiceActivity.java <<'EOF'
-          package com.jarvis.agent;
-
-          import android.graphics.Color;
-          import android.os.Bundle;
-          import android.os.Handler;
-          import android.os.Looper;
-          import android.webkit.CookieManager;
-          import com.getcapacitor.BridgeActivity;
-
-          public class VoiceActivity extends BridgeActivity {
-            static int alive = 0;
-            private int frame = 0;
-            private final Handler hd = new Handler(Looper.getMainLooper());
-            private final Runnable tick = new Runnable() {
-              @Override
-              public void run() {
-                VoiceWidget.setFrame(VoiceActivity.this, frame % 8);
-                frame++;
-                hd.postDelayed(this, 110);
-              }
-            };
-
-            @Override
-            public void onCreate(Bundle savedInstanceState) {
-              alive++;
-              CookieManager cm = CookieManager.getInstance();
-              cm.setAcceptCookie(true);
-              cm.setCookie("https://localhost", "jvmode=voice; path=/");
-              cm.flush();
-              registerPlugin(KeepAlivePlugin.class);
-              super.onCreate(savedInstanceState);
-              if (getBridge() != null && getBridge().getWebView() != null) {
-                getBridge().getWebView().setBackgroundColor(Color.TRANSPARENT);
-                getBridge().getWebView().setAlpha(0f);
-                getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
-              }
-              hd.post(tick);
-              hd.postDelayed(() -> { if (!isFinishing()) finish(); }, 150000);
-            }
-
-            @Override
-            public void onDestroy() {
-              hd.removeCallbacksAndMessages(null);
-              if (--alive <= 0) {
-                alive = 0;
-                CookieManager cm = CookieManager.getInstance();
-                cm.setCookie("https://localhost", "jvmode=main; path=/");
-                cm.flush();
-                VoiceWidget.setFrame(this, -1);
-              }
-              super.onDestroy();
-            }
-          }
-          EOF
-
-          cat > $D/VoiceWidget.java <<'EOF'
-          package com.jarvis.agent;
-
-          import android.app.PendingIntent;
-          import android.appwidget.AppWidgetManager;
-          import android.appwidget.AppWidgetProvider;
-          import android.content.ComponentName;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.view.View;
-          import android.widget.RemoteViews;
-
-          public class VoiceWidget extends AppWidgetProvider {
-            static final int[] RING = {
-              R.drawable.widget_ring_0, R.drawable.widget_ring_1, R.drawable.widget_ring_2, R.drawable.widget_ring_3,
-              R.drawable.widget_ring_4, R.drawable.widget_ring_5, R.drawable.widget_ring_6, R.drawable.widget_ring_7
-            };
-
-            static RemoteViews build(Context c, int frame) {
-              Intent i = new Intent(c, VoiceActivity.class);
-              i.setAction("com.jarvis.agent.VOICE");
-              i.putExtra("suara", true);
-              i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-              PendingIntent pi = PendingIntent.getActivity(c, 7, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-              RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_voice);
-              v.setOnClickPendingIntent(R.id.vw_root, pi);
-              if (frame >= 0) {
-                v.setViewVisibility(R.id.vw_ring, View.VISIBLE);
-                v.setImageViewResource(R.id.vw_ring, RING[frame % RING.length]);
-                v.setTextViewText(R.id.vw_label, "Mendengarkan");
-              }
-              return v;
-            }
-
-            static void setFrame(Context c, int frame) {
-              try {
-                AppWidgetManager m = AppWidgetManager.getInstance(c);
-                int[] ids = m.getAppWidgetIds(new ComponentName(c, VoiceWidget.class));
-                for (int id : ids) m.updateAppWidget(id, build(c, frame));
-              } catch (Exception e) {}
-            }
-
-            @Override
-            public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
-              for (int id : ids) m.updateAppWidget(id, build(c, -1));
-            }
-          }
-          EOF
-
-      - name: Sinkronkan dan bangun APK
-        run: |
-          npx cap sync android
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Jarvis-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+/* =========================================================
+   INIT
+   ========================================================= */
+(async function init(){
+  if(JV.native){
+    addMsg('Mode native aktif. Semua fitur tersedia.','sys');
+    // tanya izin notifikasi + lokasi awal
+    try{ await JV.LN.requestPermissions(); }catch{}
+    try{ await JV.GEO.requestPermissions(); }catch{}
+    try{ await JV.SR.requestPermissions(); }catch{}
+  } else {
+    addMsg('Mode web. Fitur native terbatas.','sys');
+  }
+})();
+</script>
+</body>
+</html>
