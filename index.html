@@ -90,6 +90,12 @@ body.sh .sheet{transform:none}
 .shead b{font-size:20px;font-weight:700}
 .shead .pill{height:38px;padding:0 15px;font-size:15px;font-weight:600}
 .sbody{overflow-y:auto;padding:6px 0 18px}
+.cmdp{position:fixed;z-index:9;top:calc(var(--st) + 8px);right:8px;bottom:calc(var(--sb) + 8px);width:min(88vw,380px);border-radius:30px;display:flex;flex-direction:column;background:var(--gl2);transform:translateX(115%);transition:transform .38s cubic-bezier(.2,.85,.25,1)}
+body.cm .scrim{opacity:1;pointer-events:auto}
+body.cm .cmdp{transform:none}
+.cmdp .cg{font-size:13px;font-weight:600;color:var(--tx2);margin:14px 24px 6px}
+.cmdp .row{flex-direction:column;align-items:flex-start;gap:2px}
+.cmdp .row small{font-size:13px;color:var(--tx2)}
 .grp{background:var(--grp);border-radius:20px;margin:0 16px 8px;overflow:hidden}
 .row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 16px;min-height:50px;width:100%;border:0;background:none;color:var(--tx);font-size:17px;text-align:left}
 .row+.row{box-shadow:inset 0 .5px 0 var(--tx3)}
@@ -191,6 +197,7 @@ details.more summary::-webkit-details-marker{display:none}details.more summary::
   <header class="top">
     <button class="pill glass" id="bNew">Baru</button>
     <div class="ttl glass"><b id="aiT">Jarvis</b><span id="stat">Siap</span></div>
+    <button class="ib2 glass" id="bCmd" data-i="list" aria-label="Daftar perintah"></button>
     <button class="ib2 glass" data-thm aria-label="Ganti tema"></button>
     <button class="pill glass" id="bSet">Pengaturan</button>
   </header>
@@ -221,15 +228,21 @@ details.more summary::-webkit-details-marker{display:none}details.more summary::
   <p class="cap" id="aEmpty" style="margin:0 6px 8px">Belum ada aturan. Pilih contoh di atas atau ketik aturanmu.</p>
   <details class="more"><summary>Lainnya</summary>
     
+    <p class="ahd">Alarm dan timer</p>
+    <div class="alog glass" id="aAl"></div>
     <p class="ahd">Riwayat</p>
     <div class="alog glass" id="aLog"></div>
-    <div class="grp" style="margin:16px 0 8px"><button class="row blue" id="aExp">Salin semua aturan</button><button class="row blue" id="aImp">Tempel aturan</button></div>
+    <div class="grp" style="margin:16px 0 8px"><button class="row blue" id="aExp">Salin semua aturan</button><button class="row blue" id="aExpF">Bagikan cadangan (file/teks)</button><button class="row blue" id="aImp">Tempel aturan</button><button class="row blue" id="aImpF">Impor dari file</button><input type="file" id="aFile" accept=".json,.txt,application/json,text/plain" hidden></div>
   </details>
   </section>
 <nav class="tabbar glass" id="tabs"><button class="on" data-t="j">Jarvis</button><button data-t="a">Otomasi</button></nav>
 <div class="toast glass" id="toast"></div>
 
 <div class="scrim" id="scrim"></div>
+<section class="cmdp" id="cmdp" aria-label="Perintah">
+  <div class="shead"><b>Perintah</b><button class="pill glass" id="cmdX">Tutup</button></div>
+  <div class="sbody" id="cmdL"></div>
+</section>
 <section class="sheet" id="sheet" aria-label="Pengaturan">
   <div class="shead"><b>Pengaturan</b><button class="pill glass" id="bDone">Selesai</button></div>
   <div class="sbody">
@@ -296,6 +309,9 @@ details.more summary::-webkit-details-marker{display:none}details.more summary::
     <p class="ahd" style="margin:6px 24px 8px">3. Maka lakukan ini, berurutan</p>
     <div id="aActs"></div>
     <div class="grp"><button class="row blue" id="aAddAct">Tambah aksi</button></div>
+    <p class="ahd" style="margin:6px 24px 8px">4. Jika syarat atau jam tidak cocok, lakukan ini (opsional)</p>
+    <div id="aElse"></div>
+    <div class="grp"><button class="row blue" id="aAddElse">Tambah aksi "lain"</button></div>
     <p class="cap" style="margin:0 16px 8px">Variabel di teks aksi: %JAM% %TANGGAL% %HARI% %BATERAI% %CAS% %NAMA% %NOTIFAPP% %NOTIFJUDUL% %NOTIFISI%</p>
     <div class="grp"><button class="row blue" id="aSave">Simpan</button><button class="row act" id="aDel">Hapus aturan</button></div>
   </div>
@@ -368,7 +384,9 @@ const T={
     if(!at||isNaN(at)||at<=new Date())return 'Waktu tidak valid atau sudah lewat.';
     const p=await LN.requestPermissions();
     if(p.display==='denied')return 'Izin notifikasi ditolak pengguna.';
-    await LN.schedule({notifications:[{id:Math.floor(Math.random()*2e9),title:'Jarvis',body:a.pesan,schedule:{at,allowWhileIdle:true}}]});
+    const nid=Math.floor(Math.random()*2e9);
+    await LN.schedule({notifications:[{id:nid,title:'Jarvis',body:a.pesan,schedule:{at,allowWhileIdle:true}}]});
+    alPrune();D.tm.push({id:nid,at:+at,p:String(a.pesan||'').slice(0,60),k:a.jenis==='timer'?'timer':'pengingat'});save();renderAl();
     return 'Pengingat dijadwalkan pada '+at.toLocaleString('id-ID')+'.'},
   async ingat(a){D.mem.push(a.fakta);save();renderMem();return 'Tersimpan.'},
   async lupakan(a){const k=String(a.kata_kunci).toLowerCase(),n=D.mem.length;D.mem=D.mem.filter(m=>!m.toLowerCase().includes(k));save();renderMem();return `${n-D.mem.length} ingatan dihapus.`},
@@ -386,6 +404,7 @@ const T={
     const m=/^(\d{1,2})[:.](\d{2})$/.exec(String(a.jam||'').trim());if(!m||+m[1]>23||+m[2]>59)throw new Error('isi jam dengan format HH:MM');
     const hari=[...new Set((Array.isArray(a.hari)?a.hari:[]).map(Number).filter(n=>n>=1&&n<=7))];
     await KA.alarm({jam:+m[1],menit:+m[2],pesan:String(a.pesan||'Jarvis').slice(0,60),...(hari.length?{hari}:{})});
+    {const nx=new Date();nx.setHours(+m[1],+m[2],0,0);if(nx<=new Date())nx.setDate(nx.getDate()+1);almAdd({id:Date.now(),h:+m[1],m:+m[2],p:String(a.pesan||'Jarvis').slice(0,60),d:hari,at:+nx})}
     return 'Alarm dipasang di aplikasi Jam pukul '+pad2(+m[1])+'.'+m[2]+(hari.length===7?', setiap hari':hari.length?', hari '+hari.map(d=>DN[d]).join(' '):'')+'.'},
   async mode_senyap(a){if(!KA)throw new Error('hanya di aplikasi Android');
     const m=['on','off','toggle','alarm','total'].includes(a.mode)?a.mode:'on';
@@ -414,6 +433,7 @@ const T={
     const bad=acts.find(x=>!x||!ACT[x.type]);if(bad)return 'Jenis aksi tidak dikenal: '+(bad&&bad.type)+'. Pilihan: '+Object.keys(ACT).join(', ')+'.';
     const x={name:a.nama,trig:t,acts};
     if(a.syarat&&CL[a.syarat])x.cond={type:a.syarat,val:a.syarat_persen};
+    if(Array.isArray(a.aksi_lain))x.els=a.aksi_lain;
     if((a.jam_dari&&a.jam_sampai)||(Array.isArray(a.hari_syarat)&&a.hari_syarat.length))x.win={from:a.jam_dari,to:a.jam_sampai,days:a.hari_syarat};
     const v=norm(x);if(!v)return 'Aturan tidak valid.';
     const r={id:Date.now()%1e8,on:true,...v};A.rules.push(r);saveA();await sched(r);renderA();
@@ -476,6 +496,7 @@ function defs(){
         syarat:{type:'string',enum:['bl','bg','ch','nc'],description:'Syarat opsional: bl baterai di bawah, bg di atas, ch sedang dicas, nc tidak dicas'},
         jam_dari:s('Syarat opsional: hanya jalan mulai jam HH:MM'),jam_sampai:s('Syarat opsional: sampai jam HH:MM, boleh melewati tengah malam'),hari_syarat:{type:'array',items:{type:'number'},description:'Syarat opsional: hanya pada hari ini, 1=Minggu sampai 7=Sabtu'},
         syarat_persen:{type:'number',description:'Persen untuk syarat bl atau bg'},
+        aksi_lain:{type:'array',description:'Opsional, hanya bersama syarat: aksi bila syarat atau jam tidak cocok',items:{type:'object',properties:{type:{type:'string'},val:{type:'string'},val2:{type:'string'}}}},
         aksi:{type:'array',description:'Aksi berurutan',items:{type:'object',properties:{
           type:{type:'string',enum:['notif','ucap','app','url','salin','bagi','http','tunggu','senter','volume','getar','alarm','senyap','cerah','media'],description:'Jenis aksi'},
           val:{type:'string',description:'notif: pesan. ucap: kalimat. app: nama paket. url: tautan. salin/bagi: teks. http: alamat webhook. tunggu: detik. senter: on/off/toggle. volume: persen 0-100 atau +N/-N. alarm: jam HH:MM. senyap: on/off/toggle/alarm/total. cerah: persen 1-100, +N/-N, atau auto. media: play/pause/toggle/next/prev/stop.'},
@@ -738,18 +759,71 @@ function findApp(q){
   });
   return best;
 }
+const SYNM={nyalain:'nyalakan',nyalaiin:'nyalakan',hidupin:'nyalakan',aktifin:'aktifkan',matiin:'matikan',padamin:'matikan',nonaktifin:'nonaktifkan',bukain:'bukakan',bukak:'bukakan',kerasin:'keraskan',gedein:'keraskan',besarin:'besarkan',pelanin:'pelankan',kecilin:'kecilkan',naikin:'naikkan',turunin:'turunkan',terangin:'terangkan',redupin:'redupkan',gelapin:'redupkan',getarin:'getarkan',telfon:'telepon',nelpon:'telepon',nelfon:'telepon',nelepon:'telepon',telponin:'hubungi',teleponin:'hubungi',telfonin:'hubungi',hubungin:'hubungi',ngingetin:'ingatkan',ingetin:'ingatkan',bikinin:'buatkan',buatin:'buatkan',bilangin:'bilang',hape:'hp',handphone:'hp',ponsel:'hp',smartphone:'hp'};
+const KNOWNW=['nyalakan','matikan','bukakan','senter','volume','kecerahan','baterai','ingatkan','telepon','hubungi','getarkan','naikkan','turunkan','keraskan','pelankan','berikutnya','sebelumnya','otomasi','nonaktifkan','aktifkan','hapus','batalkan','daftar','tampilkan','jalankan'];
+function lev1(a,b){if(a===b)return true;if(Math.abs(a.length-b.length)>1)return false;let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
+  if(a.length===b.length)return a.slice(i+1)===b.slice(i+1)||(a[i]===b[i+1]&&a[i+1]===b[i]&&a.slice(i+2)===b.slice(i+2));
+  return a.length>b.length?a.slice(i+1)===b.slice(i):b.slice(i+1)===a.slice(i)}
+function syn(w){
+  w=' '+w+' ';
+  w=w.replace(/ mode (hening|diam|sunyi|silent|bisu) /g,' mode senyap ').replace(/ (lampu (senter|flash|hp|belakang)|flashlight|torch|obor) /g,' senter ')
+    .replace(/ (baterai|batre|senter|volume|alarm|timer|layar|wifi|jam|tanggal|kecerahan)nya /g,' $1 ');
+  return w.trim().split(' ').map(x=>{if(SYNM[x])return SYNM[x];if(x.length<6||KNOWNW.includes(x))return x;const k=KNOWNW.find(y=>lev1(x,y));return k||x}).join(' ')}
+const AKSV='nyalakan|matikan|hidupkan|bukakan|buka|getarkan|ucapkan|bilang|katakan|munculkan|tampilkan|putar|jeda|atur|naikkan|turunkan|telepon|hubungi|whatsapp|sms|wa|kirim|volume|kecerahan|mode|senter|stop|pause|play|bisukan|tunggu|mainkan|hentikan';
+function actOne(p){
+  let m;
+  if((m=/^(?:ucapkan|bilang|katakan|bacakan|suarakan) (.+)$/.exec(p)))return{type:'ucap',val:m[1]};
+  if((m=/^(?:munculkan |tampilkan |kasih |beri )?(?:notifikasi|notif)\s+(?:bahwa |bertuliskan |isi |berisi )?(.+)$/.exec(p)))return{type:'notif',val:m[1]};
+  if(/\bsenter\b/.test(p))return{type:'senter',val:/\b(matikan|mati|off|padamkan)\b/.test(p)?'off':'on'};
+  if(/\b(mode senyap|jangan ganggu)\b/.test(p))return{type:'senyap',val:/\b(matikan|mati|off|keluar)\b/.test(p)?'off':'on'};
+  if(/\bvolume\b|^bisukan\b/.test(p)){
+    const jenis=/\bdering\b/.test(p)?'dering':/\balarm\b/.test(p)?'alarm':/\b(notifikasi|notif)\b/.test(p)?'notifikasi':'media',n=/(\d{1,3})/.exec(p);
+    const v=/\b(bisukan|senyap|bisu|mute)\b/.test(p)?'0':/\b(maksimal|penuh|full)\b/.test(p)?'100':n?(/\b(naikkan|tambah)\b/.test(p)?'+'+n[1]:/\b(turunkan|kurangi)\b/.test(p)?'-'+n[1]:n[1]):null;
+    return v==null?null:{type:'volume',val:v,val2:jenis}}
+  if(/\b(kecerahan|layar terang)\b/.test(p)){const n=/(\d{1,3})/.exec(p);return/\b(otomatis|auto)\b/.test(p)?{type:'cerah',val:'auto'}:n?{type:'cerah',val:String(Math.min(100,+n[1]))}:null}
+  if(/^getar/.test(p))return{type:'getar',val:'400'};
+  if(/^(?:putar|play|mainkan)\b/.test(p))return{type:'media',val:'play'};
+  if(/^(?:jeda|pause)\b/.test(p))return{type:'media',val:'pause'};
+  if(/^(?:stop|hentikan)\b/.test(p))return{type:'media',val:'stop'};
+  if((m=/^(?:telepon|hubungi|panggil) (.+)$/.exec(p))){const nm=m[1].replace(/^ke /,'');return/^\+?\d[\d ]{5,}$/.test(nm)?{type:'url',val:'tel:'+nm.replace(/\s/g,'')}:{type:'telp',val:nm}}
+  if((m=/^(whatsapp|sms|wa) (?:ke )?(.+?)(?: (?:isi|bilang|pesan|bertuliskan) (.+))?$/.exec(p)))return{type:m[1]==='sms'?'sms':'wa',val:m[2],...(m[3]?{val2:m[3]}:{})};
+  if((m=/^tunggu (\d+) ?(detik|menit)?$/.exec(p)))return{type:'tunggu',val:String(m[2]==='menit'?+m[1]*60:+m[1])};
+  if((m=/^(?:buka|bukakan|jalankan) (.+)$/.exec(p))){const ap=findApp(m[1]);return ap?{type:'app',val:ap.v}:null}
+  return null}
+function parseActs(s){
+  s=String(s||'').trim();if(!s)return null;
+  const out=[];for(const p of s.split(new RegExp('\\s+(?:dan|lalu|terus|kemudian|setelah itu)\\s+(?=(?:'+AKSV+')\\b)'))){const a=actOne(p.trim());if(!a)return null;out.push(a)}
+  return out.length<=8?out:null}
+function parseRule(t){
+  t=t.replace(/^(?:tolong )?(?:buatkan |buat |bikin |bikinkan |jadikan )?(?:otomasi |aturan )?/,'');
+  const K='(?:kalau|jika|apabila|ketika|bila)',M='(?: maka)? (.+)$';let m,trig,rest,name;
+  if((m=new RegExp('^'+K+' (?:baterai|batre) (?:di bawah|dibawah|kurang dari|tinggal) (\\d{1,2})(?: persen)?'+M).exec(t))){trig={pemicu:'baterai',persen:+m[1]};rest=m[2];name='Baterai di bawah '+m[1]+'%'}
+  else if((m=new RegExp('^'+K+' (?:charger|cas|pengisi daya|kabel)(?: hp)? (dicolok|dipasang|terhubung|nyambung|dicabut|dilepas|terputus)'+M).exec(t))){const on=/^(dicolok|dipasang|terhubung|nyambung)$/.test(m[1]);trig={pemicu:on?'colok':'cabut'};rest=m[2];name=on?'Charger dicolok':'Charger dicabut'}
+  else if((m=new RegExp('^'+K+' wifi (tersambung|terhubung|nyambung|konek|menyala|nyala|terputus|putus|mati)'+M).exec(t))){const on=/^(tersambung|terhubung|nyambung|konek|menyala|nyala)$/.test(m[1]);trig={pemicu:on?'wifi_on':'wifi_off'};rest=m[2];name=on?'Wi-Fi tersambung':'Wi-Fi terputus'}
+  else if((m=new RegExp('^'+K+' layar (menyala|nyala|hidup|mati|padam)'+M).exec(t))){const on=/^(menyala|nyala|hidup)$/.test(m[1]);trig={pemicu:on?'layar_on':'layar_off'};rest=m[2];name=on?'Layar menyala':'Layar mati'}
+  else if((m=new RegExp('^'+K+' (?:headset|earphone|earbud|tws) (dicolok|terpasang|tersambung|terhubung|dicabut|terlepas|terputus)'+M).exec(t))){const on=/^(dicolok|terpasang|tersambung|terhubung)$/.test(m[1]);trig={pemicu:on?'headset_on':'headset_off'};rest=m[2];name=on?'Headset tersambung':'Headset dicabut'}
+  else if((m=new RegExp('^'+K+' (?:aku|saya) (?:bilang|ucap|ucapkan) (.+?) (?:maka|lalu|terus) (.+)$').exec(t))){trig={pemicu:'suara',kata:m[1]};rest=m[2];name='Suara: '+m[1]}
+  else if((m=new RegExp('^(?:setiap|tiap) (hari kerja|akhir pekan|hari|pagi|siang|sore|malam) (?:jam|pukul) (\\d{1,2})(?: (\\d{2}))?(?: (pagi|siang|sore|malam))?'+M).exec(t))){
+    let h=+m[2];const mi=m[3]?+m[3]:0,pd=m[4]||(/^(siang|sore|malam)$/.test(m[1])?m[1]:'');
+    if(pd==='siang'&&h<10)h+=12;else if(pd==='sore'&&h<12)h+=12;else if(pd==='malam')h=h===12?0:(h>=5&&h<12?h+12:h);
+    if(h>23||mi>59)return null;
+    const hari=m[1]==='hari kerja'?[2,3,4,5,6]:m[1]==='akhir pekan'?[1,7]:null;
+    trig={pemicu:'waktu',jam:pad2(h)+':'+pad2(mi),...(hari?{hari}:{})};rest=m[5];name='Jam '+pad2(h)+':'+pad2(mi)+(hari?(m[1]==='hari kerja'?' hari kerja':' akhir pekan'):'')}
+  else return null;
+  const acts=parseActs(rest);if(!acts)return null;
+  return{nama:name,...trig,aksi:acts}}
 const say=f=>async()=>typeof f==='function'?f():f;
-const HELP='Tanpa internet aku bisa: cek jam dan tanggal, baterai, senter, volume, pengingat, timer dan alarm, buka aplikasi, lokasi GPS, hitung, catat ingatan, clipboard, telepon atau SMS ke nomor atau nama kontak, getar, mode senyap, kecerahan, kontrol musik, serta menjalankan otomasi. Contoh: “nyalakan senter”, “volume 50”, “ingatkan 10 menit lagi minum obat”, “alarm jam 6 pagi”, “buka WhatsApp”, “lima kali dua belas”.';
+const HELP='Tanpa internet aku bisa: cek jam dan tanggal, baterai, senter, volume, pengingat, timer dan alarm, buka aplikasi, lokasi GPS, hitung, catat ingatan, clipboard, telepon atau SMS ke nomor atau nama kontak, getar, mode senyap, kecerahan, kontrol musik, serta menjalankan otomasi, melihat dan menghapus alarm atau timer. Bisa juga membuat aturan lewat suara, mis. “kalau baterai di bawah 20 persen nyalakan mode senyap” atau “setiap hari jam 7 pagi buka WhatsApp”. Contoh: “nyalakan senter”, “volume 50”, “ingatkan 10 menit lagi minum obat”, “alarm jam 6 pagi”, “buka WhatsApp”, “lima kali dua belas”.';
 /* Mengembalikan fungsi async (hasilnya teks balasan, atau {r,quiet}) bila perintah dikenali, atau null. */
 function localMatch(text,canAI){
-  const raw=String(text).trim(),w=wz(raw),t=numify(w);
+  const raw=String(text).trim(),w=syn(wz(raw)),t=numify(w);
   if(!t)return null;
   const rep=/\b(setiap|tiap|kalau|kalo|jika|apabila|ketika|bila|otomasi)\b/.test(t);
   const cond=/\b(kalau|kalo|jika|apabila|ketika|bila|otomasi)\b/.test(t);
   let m;
 
   /* 0. frasa pemicu suara dari tab Otomasi */
-  let ru=null;try{ru=vcFind([w])}catch(e){}
+  let ru=null;try{ru=vcFind([wz(raw)])}catch(e){}
   if(ru)return async()=>{run(ru).catch(()=>{});return{r:'Menjalankan otomasi '+ru.name+'.',quiet:true}};
 
   /* 1. bantuan */
@@ -774,6 +848,9 @@ function localMatch(text,canAI){
   }
   if(/\botomasi\b/.test(t)&&/\b(daftar|lihat|tampilkan|apa saja|apa aja|list)\b/.test(t))
     return say(()=>A.rules.length?'Ada '+A.rules.length+' otomasi: '+A.rules.map(r=>r.name+(r.on?'':' (mati)')).join(', ')+'.':'Belum ada otomasi.');
+
+  /* 3b. buat otomasi lewat suara, tanpa AI */
+  {const mk=parseRule(t);if(mk)return async()=>{const [out]=await runTool('buat_otomasi',mk);return /^Otomasi/.test(out)?'Otomasi “'+mk.nama+'” dibuat dan aktif.':out}}
 
   /* 4. ingatan */
   m=/^\s*(?:tolong\s+)?(?:ingat|catat|ingatlah)\b(?:\s+(?:bahwa|ya|kalau|kalo|ini|dong))?[\s,:]+(.+)$/i.exec(raw);
@@ -813,6 +890,23 @@ function localMatch(text,canAI){
     return async()=>{const [out]=await runTool('atur_volume',{jenis,...a});return out};
   }
 
+  /* 7b. kelola alarm dan timer */
+  if(/\b(alarm|timer|pengingat)\b/.test(t)&&!/\botomasi\b/.test(t)&&!/\b(jam|pukul|menit|detik)\b.*\b(ingatkan|buatkan|pasang|setel)\b/.test(t)){
+    const kind=/\balarm\b/.test(t)?'alarm':/\btimer\b/.test(t)?'timer':'pengingat';
+    if(/\b(daftar|lihat|cek|tampilkan|apa saja|apa aja|list)\b/.test(t)&&!/\b(jam|pukul|menit|detik)\b/.test(t))
+      return say(()=>{alPrune();const L=kind==='alarm'?(D.al||[]).map(alTxt):(D.tm||[]).filter(x=>(x.k==='timer')===(kind==='timer')).map(tmTxt);
+        return L.length?'Ada '+L.length+' '+kind+': '+L.join('; ')+'.':'Tidak ada '+kind+' aktif dari Jarvis.'});
+    if(/\b(hapus|batalkan|batal|cancel|buang|matikan)\b/.test(t))
+      return async()=>{alPrune();const all=/\bsemua\b/.test(t);
+        let L=kind==='alarm'?(D.al||[]).slice():(D.tm||[]).filter(x=>(x.k==='timer')===(kind==='timer'));
+        if(!L.length)return 'Tidak ada '+kind+' aktif dari Jarvis.';
+        const tm=/\b(?:jam|pukul) (\d{1,2})(?: (\d{2}))?/.exec(t);
+        if(tm&&kind==='alarm'){const hh=+tm[1],mm=tm[2]?+tm[2]:null;L=L.filter(x=>(x.h===hh||x.h%12===hh%12)&&(mm===null||x.m===mm));if(!L.length)return 'Tidak ada alarm pada jam itu.'}
+        else if(!all&&L.length>1)return 'Ada '+L.length+' '+kind+': '+L.map(kind==='alarm'?alTxt:tmTxt).join('; ')+'. Sebut jamnya atau bilang semua.';
+        let nat=true;for(const x of L){if(kind==='alarm'){if(!(await alDel(x)))nat=false}else await tmDel(x)}
+        return L.length+' '+kind+' dihapus.'+(kind==='alarm'&&!nat?' Alarm di aplikasi Jam belum bisa kuhapus otomatis, hapus juga di sana.':'')}
+  }
+
   /* 8. pengingat, timer, alarm */
   if(!cond&&/\b(ingatkan|ingetin|ingatin|pengingat|reminder|timer|alarm|bangunkan|bangunin)\b/.test(t)){
     const isAlarm=/\b(alarm|bangunkan|bangunin)\b/.test(t),isTimer=/\btimer\b/.test(t);
@@ -838,7 +932,7 @@ function localMatch(text,canAI){
         if(!/^Otomasi/.test(out))return out;
         return 'Alarm diatur '+dur+' lagi, pukul '+hm+'.'};
       return async()=>{
-        const [out]=await runTool('buat_pengingat',{pesan:msg||(isTimer?'Timer selesai':'Pengingat'),menit_lagi:mins});
+        const [out]=await runTool('buat_pengingat',{pesan:msg||(isTimer?'Timer selesai':'Pengingat'),menit_lagi:mins,jenis:isTimer?'timer':'pengingat'});
         if(/^(Waktu tidak|Izin|Gagal)/.test(out))return out;
         return isTimer?'Timer '+dur+' dimulai.':'Oke, aku ingatkan '+dur+' lagi'+(msg?': '+msg:'')+'.'};
     }
@@ -1030,6 +1124,30 @@ $('#bNew').onclick=()=>{stopSpeaking();turn++;busy=false;D.hist=[];save();render
 /* ---------- pengaturan ---------- */
 function openSheet(){document.body.classList.add('sh')}
 function closeSheet(){document.body.classList.remove('sh');save()}
+const CMD=[
+ ['Info',[['Jam berapa','Jam sekarang',1],['Tanggal berapa','Hari dan tanggal',1],['Cek baterai','Level dan status cas',1],['Lokasi saya','Koordinat GPS',1]]],
+ ['Perangkat',[['Nyalakan senter','Matikan senter: “matikan senter”',1],['Volume 50','Atau “naikkan volume”'],['Kecerahan 70','Atau “kecerahan otomatis”'],['Nyalakan mode senyap','Matikan: “matikan mode senyap”',1],['Getarkan HP','',1]]],
+ ['Musik',[['Putar musik','',1],['Jeda musik','',1],['Lagu berikutnya','',1],['Lagu sebelumnya','',1]]],
+ ['Pengingat dan alarm',[['Ingatkan 10 menit lagi minum obat','Ubah waktu dan isinya'],['Alarm jam 6 pagi','Alarm asli di aplikasi Jam'],['Alarm hari kerja jam 5 pagi','Berulang Senin sampai Jumat'],['Timer 5 menit','']]],
+ ['Telepon dan pesan',[['Telepon ','Ketik nama kontak atau nomor'],['SMS Ibu, aku telat pulang','Ubah nama dan isi pesan']]],
+ ['Lainnya',[['Buka ','Ketik nama aplikasi, mis. WhatsApp'],['Lima kali dua belas','Atau “15 persen dari 200”',1],['Bantuan','Daftar perintah singkat',1]]]];
+(function(){
+  const L=$('#cmdL');
+  CMD.forEach(([g,it])=>{
+    const h=document.createElement('p');h.className='cg';h.textContent=g;L.appendChild(h);
+    const w=document.createElement('div');w.className='grp';
+    it.forEach(([t,d,go])=>{
+      const b=document.createElement('button');b.type='button';b.className='row';
+      const a=document.createElement('span');a.textContent=t.trim();b.appendChild(a);
+      if(d){const m=document.createElement('small');m.textContent=d;b.appendChild(m)}
+      b.onclick=()=>{closeCmd();
+        if(go){send(t)}
+        else{const i=$('#in');i.value=t;upd();i.focus();try{i.setSelectionRange(t.length,t.length)}catch(e){}}};
+      w.appendChild(b)});
+    L.appendChild(w)});
+})();
+const openCmd=()=>document.body.classList.add('cm'),closeCmd=()=>document.body.classList.remove('cm');
+$('#bCmd').onclick=openCmd;$('#cmdX').onclick=closeCmd;$('#scrim').addEventListener('click',closeCmd);
 $('#bSet').onclick=openSheet;$('#bDone').onclick=closeSheet;$('#scrim').onclick=closeSheet;
 function renderMem(){
   const l=$('#memList');l.textContent='';
@@ -1092,10 +1210,10 @@ A.rules.forEach(r=>{if(!r.acts){r.acts=[r.act||{type:'notif',val:''}];delete r.a
 A.apps=Array.isArray(A.apps)?A.apps:[];A.inst=Array.isArray(A.inst)?A.inst:[];
 const saveA=()=>{try{localStorage.setItem(AK,JSON.stringify(A))}catch(e){}};
 const DN=['','Min','Sen','Sel','Rab','Kam','Jum','Sab'],ALL=[1,2,3,4,5,6,7];
-const ACT={notif:'Munculkan notifikasi',ucap:'Ucapkan dengan suara',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim ke webhook',tunggu:'Tunggu beberapa detik',senter:'Atur senter',volume:'Atur volume',getar:'Getarkan HP',alarm:'Pasang alarm di aplikasi Jam',senyap:'Mode senyap (Jangan Ganggu)',cerah:'Atur kecerahan layar',media:'Kontrol musik / media'};
-const ACS={notif:'Notifikasi',ucap:'Ucapkan',app:'Buka app',url:'Buka tautan',salin:'Salin',bagi:'Bagikan',http:'Webhook',tunggu:'Tunggu',senter:'Senter',volume:'Volume',getar:'Getar',alarm:'Alarm',senyap:'Senyap',cerah:'Cerah',media:'Media'};
-const IC={torch:'<path d="M8 3h8v5l-2 3v10h-4V11L8 8z"/>',vol:'<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9c1.5 1.5 1.5 4.5 0 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',bat:'<rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v3"/>',plug:'<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',unplug:'<path d="M13 3L5 13h6l-1 8 8-10h-6zM4 4l16 16"/>',tap:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',pin:'<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',bell:'<path d="M6 16v-5a6 6 0 1112 0v5l2 2H4zM10 21h4"/>',speak:'<path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6"/>',app:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',share:'<path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',wait:'<path d="M7 3h10M7 21h10M8 3c0 6 8 6 8 18M16 3c0 6-8 6-8 18"/>',filter:'<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>',chev:'<path d="M7 10l5 5 5-5"/>',check:'<path d="M5 12l5 5 9-10"/>',eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',eyeoff:'<path d="M3 3l18 18M10.6 6.2A9.7 9.7 0 0112 6c6 0 10 6 10 6a17 17 0 01-3.2 3.7M6.6 6.7A17 17 0 002 12s4 7 10 7a9.7 9.7 0 004-.9"/>'};
-const TI={waktu:'clock',sekali:'cal',baterai:'bat',colok:'plug',cabut:'unplug',manual:'tap',suara:'speak',masuk:'pin',keluar:'pin',layar_on:'sun',layar_off:'moon',wifi_on:'globe',wifi_off:'globe',headset_on:'speak',headset_off:'speak',notif:'bell'},AI2={notif:'bell',ucap:'speak',app:'app',url:'link',salin:'copy',bagi:'share',http:'globe',tunggu:'wait',senter:'torch',volume:'vol',getar:'bell',alarm:'clock',senyap:'moon',cerah:'sun',media:'speak'};
+const ACT={notif:'Munculkan notifikasi',ucap:'Ucapkan dengan suara',app:'Buka aplikasi',url:'Buka tautan',salin:'Salin teks',bagi:'Bagikan teks',http:'Kirim ke webhook',tunggu:'Tunggu beberapa detik',senter:'Atur senter',volume:'Atur volume',getar:'Getarkan HP',alarm:'Pasang alarm di aplikasi Jam',senyap:'Mode senyap (Jangan Ganggu)',cerah:'Atur kecerahan layar',media:'Kontrol musik / media',telp:'Telepon ke kontak',wa:'WhatsApp ke kontak',sms:'SMS ke kontak'};
+const ACS={notif:'Notifikasi',ucap:'Ucapkan',app:'Buka app',url:'Buka tautan',salin:'Salin',bagi:'Bagikan',http:'Webhook',tunggu:'Tunggu',senter:'Senter',volume:'Volume',getar:'Getar',alarm:'Alarm',senyap:'Senyap',cerah:'Cerah',media:'Media',telp:'Telepon',wa:'WhatsApp',sms:'SMS'};
+const IC={list:'<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',torch:'<path d="M8 3h8v5l-2 3v10h-4V11L8 8z"/>',vol:'<path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9c1.5 1.5 1.5 4.5 0 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',cal:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/>',bat:'<rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v3"/>',plug:'<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',unplug:'<path d="M13 3L5 13h6l-1 8 8-10h-6zM4 4l16 16"/>',tap:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/>',pin:'<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',bell:'<path d="M6 16v-5a6 6 0 1112 0v5l2 2H4zM10 21h4"/>',speak:'<path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 010 6"/>',app:'<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>',link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>',share:'<path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/>',globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',wait:'<path d="M7 3h10M7 21h10M8 3c0 6 8 6 8 18M16 3c0 6-8 6-8 18"/>',filter:'<path d="M4 5h16l-6 7v6l-4 2v-8z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor"/>',chev:'<path d="M7 10l5 5 5-5"/>',check:'<path d="M5 12l5 5 9-10"/>',eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',eyeoff:'<path d="M3 3l18 18M10.6 6.2A9.7 9.7 0 0112 6c6 0 10 6 10 6a17 17 0 01-3.2 3.7M6.6 6.7A17 17 0 002 12s4 7 10 7a9.7 9.7 0 004-.9"/>'};
+const TI={waktu:'clock',sekali:'cal',baterai:'bat',colok:'plug',cabut:'unplug',manual:'tap',suara:'speak',masuk:'pin',keluar:'pin',layar_on:'sun',layar_off:'moon',wifi_on:'globe',wifi_off:'globe',headset_on:'speak',headset_off:'speak',notif:'bell'},AI2={notif:'bell',ucap:'speak',app:'app',url:'link',salin:'copy',bagi:'share',http:'globe',tunggu:'wait',senter:'torch',volume:'vol',getar:'bell',alarm:'clock',senyap:'moon',cerah:'sun',media:'speak',telp:'speak',wa:'share',sms:'share'};
 const CL={bl:'Baterai di bawah',bg:'Baterai di atas',ch:'Sedang dicas',nc:'Tidak sedang dicas'};
 const cdesc=c=>CL[c.type]+(c.val?' '+c.val+'%':'');
 const winOn=w=>!!w&&!!((w.from&&w.to)||(Array.isArray(w.days)&&w.days.length&&w.days.length<7));
@@ -1131,15 +1249,15 @@ function flow(r){const w=document.createElement('div');w.className='flow';
   r.acts.forEach((a,i)=>{const v=a.type==='app'?((A.apps.concat(A.inst,CAT).find(x=>x.v===a.val)||{}).n||a.val):a.val;
     P.push(['m',i?'Lalu':'Maka',AI2[a.type],ACS[a.type]+(a.type==='tunggu'?' '+v+' dtk':v?': '+tr(v,16):'')])});
   P.forEach((p,i)=>{if(i){const m=document.createElement('em');m.textContent='›';w.appendChild(m)}w.appendChild(fs(...p))});return w}
-const PH={notif:'Isi pesan',ucap:'Kalimat yang diucapkan',app:'Nama paket, mis. com.whatsapp',url:'https://, tel:, sms:, geo:',salin:'Teks yang disalin',bagi:'Teks yang dibagikan',http:'https://… alamat webhook',tunggu:'Berapa detik',senter:'on, off, atau toggle (kosong = on)',volume:'Persen 0-100, atau +10 / -10',getar:'Lama getar dalam milidetik (kosong = 400)',alarm:'Jam alarm, mis. 06:30',senyap:'on, off, toggle, alarm, atau total (kosong = on)',cerah:'Persen 1-100, +10 / -10, atau auto',media:'play, pause, toggle, next, prev, atau stop (kosong = toggle)'};
+const PH={notif:'Isi pesan',ucap:'Kalimat yang diucapkan',app:'Nama paket, mis. com.whatsapp',url:'https://, tel:, sms:, geo:',salin:'Teks yang disalin',bagi:'Teks yang dibagikan',http:'https://… alamat webhook',tunggu:'Berapa detik',senter:'on, off, atau toggle (kosong = on)',volume:'Persen 0-100, atau +10 / -10',getar:'Lama getar dalam milidetik (kosong = 400)',alarm:'Jam alarm, mis. 06:30',senyap:'on, off, toggle, alarm, atau total (kosong = on)',cerah:'Persen 1-100, +10 / -10, atau auto',media:'play, pause, toggle, next, prev, atau stop (kosong = toggle)',telp:'Nama kontak atau nomor',wa:'Nama kontak atau nomor',sms:'Nama kontak atau nomor'};
 const fmt=d=>new Date(d).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-let tt=0,trigT='waktu',days=ALL.slice(),ed=0,AC2=[],lastChg=null,lastEv=null;const evT={};const hit={},lf={};
+let tt=0,trigT='waktu',days=ALL.slice(),ed=0,AC2=[],AC3=[],lastChg=null,lastEv=null;const evT={};const hit={},lf={};
 function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2800)}
 const cbw=t=>CB?CB.write({string:t}):navigator.clipboard.writeText(t);
 const cbr=async()=>CB?(await CB.read()).value:await navigator.clipboard.readText();
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const when=r=>{const t=r.trig;return t.type==='waktu'?'Jam '+t.time+(t.days.length===7?', setiap hari':', '+t.days.map(d=>DN[d]).join(' ')):t.type==='sekali'?'Sekali, '+fmt(t.at):t.type==='baterai'?'Baterai di bawah '+t.val+'%':t.type==='colok'?'Charger dicolok':t.type==='cabut'?'Charger dicabut':t.type==='masuk'?'Saya tiba di tempat tersimpan':t.type==='keluar'?'Saya pergi dari tempat tersimpan':t.type==='suara'?'Saya bilang “'+t.kata+'”':t.type==='layar_on'?'Layar menyala':t.type==='layar_off'?'Layar mati':t.type==='wifi_on'?'Wi-Fi tersambung':t.type==='wifi_off'?'Wi-Fi terputus':t.type==='headset_on'?'Headset tersambung':t.type==='headset_off'?'Headset dicabut':t.type==='notif'?'Notifikasi masuk'+(t.kata?' ('+t.kata+')':''):'Tombol saja'};
-const sum=r=>when(r)+'. '+r.acts.map(a=>ACT[a.type]+(a.val?' ('+(a.val.length>22?a.val.slice(0,22)+'…':a.val)+')':'')).join(', lalu ')+'.';
+const sum=r=>when(r)+'. '+r.acts.map(a=>ACT[a.type]+(a.val?' ('+(a.val.length>22?a.val.slice(0,22)+'…':a.val)+')':'')).join(', lalu ')+'.'+(r.els&&r.els.length?' Jika syarat tidak cocok: '+r.els.map(a=>ACT[a.type]).join(', lalu ')+'.':'');
 function log(r,m){A.log.unshift({t:Date.now(),s:r.name+': '+m});A.log=A.log.slice(0,20);saveA();renderA()}
 function norm(x){
   if(!x||!x.trig)return null;
@@ -1156,7 +1274,8 @@ function norm(x){
   const acts=raw.slice(0,20).map(a=>({type:ACT[a&&a.type]?a.type:'notif',val:String((a&&a.val)||'').slice(0,300),...(a&&a.val2?{val2:String(a.val2).slice(0,500)}:{})}));
   const cn=x.cond&&CL[x.cond.type]?{type:x.cond.type,...(x.cond.val?{val:Math.min(99,Math.max(1,+x.cond.val))}:{})}:null;
   const wn=normWin(x.win);
-  return acts.length?{name:String(x.name||'Aturan baru').slice(0,40),trig,acts,...(cn?{cond:cn}:{}),...(wn?{win:wn}:{})}:null;
+  const els=(Array.isArray(x.els)?x.els:[]).slice(0,20).map(a=>({type:ACT[a&&a.type]?a.type:'notif',val:String((a&&a.val)||'').slice(0,300),...(a&&a.val2?{val2:String(a.val2).slice(0,500)}:{})}));
+  return acts.length?{name:String(x.name||'Aturan baru').slice(0,40),trig,acts,...(cn?{cond:cn}:{}),...(wn?{win:wn}:{}),...(els.length&&(cn||wn)?{els}:{})}:null;
 }
 async function sched(r){
   if(!LN)return;
@@ -1195,6 +1314,33 @@ async function expand(v){
     HARI:n.toLocaleDateString('id-ID',{weekday:'long'}),BATERAI:lv,CAS:ch,NAMA:D.name||'',NOTIFAPP:ev.app||'',NOTIFJUDUL:ev.judul||'',NOTIFISI:ev.isi||''};
   return v.replace(/%(JAM|TANGGAL|HARI|BATERAI|CAS|NAMA|NOTIFAPP|NOTIFJUDUL|NOTIFISI)%/g,(x,k)=>M[k]);
 }
+
+/* ---------- kontak, alarm, timer ---------- */
+function waNum(n){n=String(n).replace(/^\+/,'');return n.startsWith('0')?'62'+n.slice(1):n}
+async function kontakCari(nm){
+  nm=String(nm||'').trim();if(!nm)throw new Error('nama kontak kosong');
+  if(/^\+?\d[\d ]{5,}$/.test(nm))return{n:nm,v:nm.replace(/\s/g,'')};
+  if(!KA)throw new Error('hanya di aplikasi Android');
+  const l=((await KA.kontak({nama:nm})).kontak)||[];
+  if(!l.length)throw new Error('kontak "'+nm+'" tidak ada');
+  const names=[...new Set(l.map(x=>x.n))];
+  if(names.length>1){const ex=l.filter(x=>x.n.toLowerCase()===nm.toLowerCase());if(ex.length)return ex[0];throw new Error('ada beberapa kontak: '+names.slice(0,3).join(', '))}
+  return l[0]}
+const hmS=(h,m)=>pad2(h)+'.'+pad2(m);
+function almAdd(o){D.al=(D.al||[]).filter(x=>!(x.h===o.h&&x.m===o.m&&x.p===o.p&&String(x.d)===String(o.d)));D.al.push(o);save();renderAl()}
+function alPrune(){const n=Date.now();D.al=(D.al||[]).filter(x=>(x.d&&x.d.length)||x.at>n);D.tm=(D.tm||[]).filter(x=>x.at>n)}
+async function alDel(x){D.al=(D.al||[]).filter(y=>y.id!==x.id);save();let nat=false;
+  try{if(KA&&KA.alarmHapus){await KA.alarmHapus({jam:x.h,menit:x.m,pesan:x.p});nat=true}}catch(e){}
+  renderAl();return nat}
+async function tmDel(x){D.tm=(D.tm||[]).filter(y=>y.id!==x.id);save();try{if(LN)await LN.cancel({notifications:[{id:x.id}]})}catch(e){}renderAl()}
+const alTxt=x=>'Alarm '+hmS(x.h,x.m)+(x.p&&x.p!=='Jarvis'?' · '+x.p:'')+(x.d&&x.d.length?(x.d.length===7?' · setiap hari':' · '+x.d.map(d=>DN[d]).join(' ')):'');
+const tmTxt=x=>(x.k==='timer'?'Timer ':'Pengingat ')+new Date(x.at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+(x.p?' · '+x.p:'');
+function renderAl(){const w=$('#aAl');if(!w)return;alPrune();w.textContent='';
+  const rows=[...(D.al||[]).map(x=>({s:alTxt(x),f:()=>alDel(x)})),...(D.tm||[]).map(x=>({s:tmTxt(x),f:()=>tmDel(x)}))];
+  if(!rows.length){w.textContent='Belum ada alarm atau timer dari Jarvis.';return}
+  rows.forEach(r=>{const d=document.createElement('div');d.style.cssText='display:flex;align-items:center;gap:8px;justify-content:space-between';
+    const sp=document.createElement('span');sp.textContent=r.s;const b=document.createElement('button');b.className='mini del';b.textContent='Hapus';
+    b.onclick=async()=>{await r.f();toast('Dihapus.')};d.append(sp,b);w.appendChild(d)})}
 async function step(a,r){
   const v=await expand(a.val||''),v2=await expand(a.val2||'');
   if(a.type==='notif'){
@@ -1213,17 +1359,24 @@ async function step(a,r){
   else if(a.type==='senyap'){await T.mode_senyap({mode:v.trim().toLowerCase()||'on'})}
   else if(a.type==='cerah'){const q=v.trim().toLowerCase();await T.kecerahan(q==='auto'?{mode:'auto'}:/^[+-]/.test(q)?{ubah:+q}:{persen:+q})}
   else if(a.type==='media'){await T.kontrol_media({aksi:v.trim().toLowerCase()||'toggle'})}
+  else if(a.type==='telp'||a.type==='wa'||a.type==='sms'){if(!AL)throw new Error('hanya di aplikasi Android');
+    const k=await kontakCari(v),num=k.v.replace(/[^\d+]/g,'');
+    await AL.openUrl({url:a.type==='telp'?'tel:'+num:a.type==='sms'?'sms:'+num+(v2?'?body='+encodeURIComponent(v2):''):'https://wa.me/'+waNum(num)+(v2?'?text='+encodeURIComponent(v2):'')})}
   else if(a.type==='tunggu')await sleep(Math.min(300,Math.max(0,+v||0))*1000);
   else{if(!AL)throw new Error('hanya jalan di aplikasi Android');await AL.openUrl({url:v})}
 }
 async function okc(c){if(!DV)return true;try{const b=await DV.getBatteryInfo(),lv=Math.round((b.batteryLevel||0)*100);return c.type==='bl'?lv<c.val:c.type==='bg'?lv>c.val:c.type==='ch'?!!b.isCharging:!b.isCharging}catch(e){return true}}
 const okc2=async r=>(!r.cond||await okc(r.cond))&&winOk(r.win);
-async function run(r){
-  if(!(await okc2(r))){log(r,'dilewati, syarat belum cocok');return}
-  for(const a of r.acts){
-    try{await step(a,r)}catch(e){const m=e&&e.message||e;toast('Gagal: '+m);log(r,'gagal di "'+ACT[a.type]+'", '+m);return}
+async function runL(L,r){
+  for(const a of L){
+    try{await step(a,r)}catch(e){const m=e&&e.message||e;toast('Gagal: '+m);log(r,'gagal di "'+ACT[a.type]+'", '+m);return false}
   }
-  log(r,'berhasil');
+  return true}
+async function run(r){
+  if(!(await okc2(r))){
+    if(r.els&&r.els.length){if(await runL(r.els,r))log(r,'syarat tidak cocok, aksi "lain" berhasil');return}
+    log(r,'dilewati, syarat belum cocok');return}
+  if(await runL(r.acts,r))log(r,'berhasil')
 }
 function fire(rid){
   const r=A.rules.find(x=>x.id===rid);if(!r)return;
@@ -1328,7 +1481,7 @@ function renderA(){
     const ck=document.createElement('input');ck.type='checkbox';ck.checked=!!r.on;
     ck.onchange=()=>{r.on=ck.checked;saveA();sched(r)};
     sw.append(ck,document.createElement('i'));const fl=flow(r);fl.hidden=!op[r.id];const ub=document.createElement('button');ub.className='mini';ub.style.marginLeft='auto';ub.textContent='Ubah';ub.onclick=()=>openA(r.id);fl.appendChild(ub);d.append(t,tes,sw,fl);l.appendChild(d)});
-  $('#aLog').textContent=A.log.length?A.log.map(x=>fmt(x.t)+'  '+x.s).join('\n'):'Belum ada riwayat.';
+  $('#aLog').textContent=A.log.length?A.log.map(x=>fmt(x.t)+'  '+x.s).join('\n'):'Belum ada riwayat.';renderAl();
 }
 function setTrig(t){trigT=t;$('#aTrigSel').value=t;$('#rWaktu').hidden=t!=='waktu';$('#rSekali').hidden=t!=='sekali';$('#rSuara').hidden=t!=='suara';$('#rNotif').hidden=t!=='notif';$('#rBat').hidden=t!=='baterai';$('#rLok').hidden=!(t==='masuk'||t==='keluar')}
 let wdays=ALL.slice();
@@ -1354,8 +1507,8 @@ function apPick(cb){
     if(!rows.length){const e=document.createElement('div');e.className='apn';e.textContent='Tidak ketemu. Coba kata lain.';l.appendChild(e)}};
   q.oninput=draw;draw();m.classList.add('on');setTimeout(()=>q.focus(),150)}
 $('#apm').onclick=e=>{if(e.target.id==='apm')e.currentTarget.classList.remove('on')};
-function drawActs(){
-  const w=$('#aActs');w.textContent='';
+function drawActs(){drawL(AC2,$('#aActs'));drawL(AC3,$('#aElse'))}
+function drawL(AC2,w){w.textContent='';
   AC2.forEach((a,i)=>{
     const g=document.createElement('div');g.className='grp';
     const r1=document.createElement('div');r1.className='row';
@@ -1370,7 +1523,7 @@ function drawActs(){
     if(a.type==='app'){const r=document.createElement('div');r.className='row';const lb=document.createElement('span');lb.textContent='Aplikasi';
       const b=document.createElement('button');b.type='button';b.className='dd';const tx=document.createElement('span');tx.textContent=a.val?appName(a.val):'Pilih aplikasi';b.append(tx);b.insertAdjacentHTML('beforeend',SV('chev'));
       b.onclick=()=>apPick(o=>{a.val=o.v;drawActs()});r.append(lb,b);g.appendChild(r)}
-    else{inp('val',PH[a.type]);if(a.type==='http')inp('val2','Isi JSON (kosong = GET)');if(a.type==='volume')inp('val2','Jenis: media, dering, alarm, notifikasi (kosong = media)');if(a.type==='alarm')inp('val2','Label alarm (kosong = nama aturan)')}
+    else{inp('val',PH[a.type]);if(a.type==='http')inp('val2','Isi JSON (kosong = GET)');if(a.type==='volume')inp('val2','Jenis: media, dering, alarm, notifikasi (kosong = media)');if(a.type==='alarm')inp('val2','Label alarm (kosong = nama aturan)');if(a.type==='wa'||a.type==='sms')inp('val2','Isi pesan (boleh kosong)')}
     w.appendChild(g)});
 }
 function openA(id,pre){
@@ -1379,7 +1532,7 @@ function openA(id,pre){
   const r=id?A.rules.find(x=>x.id===id):(pre||{name:'',trig:{type:'waktu',time:'07:00',days:ALL},acts:[{type:'notif',val:''}]});
   $('#aName').value=r.name;setTrig(r.trig.type);$('#aKata').value=r.trig.type==='suara'?(r.trig.kata||''):'';$('#aNotif').value=r.trig.type==='notif'?(r.trig.kata||''):'';$('#aTime').value=r.trig.time||'07:00';$('#aBat').value=r.trig.val||20;lok=r.trig.lat!=null?{lat:r.trig.lat,lng:r.trig.lng}:null;$('#aLokR').value=r.trig.r||150;lokc();$('#aCond').value=(r.cond&&r.cond.type)||'';$('#aCV').value=(r.cond&&r.cond.val)||20;cv();
   $('#aSekali').value=r.trig.at||new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
-  days=(r.trig.days||ALL).slice();drawDays();AC2=r.acts.map(a=>({...a}));drawActs();loadApps(1).then(()=>{if(document.body.classList.contains('as'))drawActs()});
+  days=(r.trig.days||ALL).slice();drawDays();AC2=r.acts.map(a=>({...a}));AC3=(r.els||[]).map(a=>({...a}));drawActs();loadApps(1).then(()=>{if(document.body.classList.contains('as'))drawActs()});
   $('#aWF').value=(r.win&&r.win.from)||'';$('#aWT').value=(r.win&&r.win.to)||'';wdays=((r.win&&r.win.days)||ALL).slice();drawWDays();
   $('#aDel').hidden=!ed;$('#aTitle').textContent=ed?'Ubah aturan':'Aturan baru';document.body.classList.add('as');
 }
@@ -1398,16 +1551,20 @@ $('#aSave').onclick=()=>{
   const cc=$('#aCond').value,cond=cc?{type:cc,...(cc==='bl'||cc==='bg'?{val:Math.min(99,Math.max(1,+$('#aCV').value||20))}:{})}:null;
   const wf=$('#aWF').value,wt=$('#aWT').value;if(!!wf!==!!wt){toast('Isi jam dari dan sampai keduanya, atau kosongkan keduanya.');return}
   const win=normWin({from:wf,to:wt,days:wdays});
-  const acts=AC2.map(a=>({type:a.type,val:(a.val||'').trim(),...(['http','volume','alarm'].includes(a.type)&&a.val2&&a.val2.trim()?{val2:a.val2.trim()}:{})}));
+  const acts=AC2.map(a=>({type:a.type,val:(a.val||'').trim(),...(['http','volume','alarm','wa','sms'].includes(a.type)&&a.val2&&a.val2.trim()?{val2:a.val2.trim()}:{})}));
   if(!acts.length){toast('Tambah minimal satu aksi.');return}
   const bad=acts.find(a=>!['notif','getar','senyap','media'].includes(a.type)&&!a.val);if(bad){toast('Isi aksi "'+ACT[bad.type]+'" dulu.');return}
+  const els=AC3.map(a=>({type:a.type,val:(a.val||'').trim(),...(['http','volume','alarm','wa','sms'].includes(a.type)&&a.val2&&a.val2.trim()?{val2:a.val2.trim()}:{})}));
+  const badE=els.find(a=>!['notif','getar','senyap','media'].includes(a.type)&&!a.val);if(badE){toast('Isi aksi "lain" "'+ACT[badE.type]+'" dulu.');return}
+  if(els.length&&!cond&&!win){toast('Aksi "lain" butuh syarat atau batas jam.');return}
   const ph=acts.find(a=>/<(TOKEN|CHAT_ID|TOPIK)>/.test(a.val));if(ph){toast('Ganti '+(/<(TOKEN|CHAT_ID|TOPIK)>/.exec(ph.val)[0])+' di aksi webhook dulu.');return}
   let r=ed&&A.rules.find(x=>x.id===ed);
-  if(r)Object.assign(r,{name,trig,acts,cond,win});else{r={id:Date.now()%1e8,on:true,name,trig,acts,cond,win};A.rules.push(r)}
+  if(r)Object.assign(r,{name,trig,acts,cond,win,els});else{r={id:Date.now()%1e8,on:true,name,trig,acts,cond,win,els};A.rules.push(r)}
   saveA();closeA();renderA();sched(r);
 };
 $('#aDel').onclick=()=>{const r=A.rules.find(x=>x.id===ed);if(!r)return;r.on=false;sched(r);A.rules=A.rules.filter(x=>x!==r);saveA();closeA();renderA()};
 $('#aAddAct').onclick=()=>{AC2.push({type:'notif',val:''});drawActs()};
+$('#aAddElse').onclick=()=>{AC3.push({type:'notif',val:''});drawActs()};
 $('#aTrigSel').onchange=()=>setTrig($('#aTrigSel').value);
 $('#aClose').onclick=closeA;$('#scrim').addEventListener('click',closeA);$('#aAdd').onclick=()=>openA(0);
 
@@ -1472,13 +1629,22 @@ $('#aMake').onclick=async()=>{
   b.disabled=false;b.textContent='Buat';
 };
 $('#aIn').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#aMake').click()}};
-$('#aExp').onclick=async()=>{try{await cbw(JSON.stringify(A.rules));toast('Aturan disalin.')}catch(e){toast('Gagal menyalin.')}};
-$('#aImp').onclick=async()=>{
-  try{const x=JSON.parse(await cbr());if(!Array.isArray(x))throw 0;let n=0;
-    for(const y of x){const v=norm(y);if(v){const r={id:(Date.now()+n)%1e8,on:true,...v};A.rules.push(r);sched(r);n++}}
-    saveA();renderA();toast(n+' aturan ditempel.')}
-  catch(e){toast('Clipboard tidak berisi aturan yang valid.')}
-};
+const bkJson=()=>JSON.stringify({jarvis:1,t:Date.now(),rules:A.rules},null,1);
+function bkImport(x){
+  const rs=Array.isArray(x)?x:x&&Array.isArray(x.rules)?x.rules:null;if(!rs)throw 0;
+  const key=v=>JSON.stringify([v.name,v.trig,v.acts,v.els||[]]),have=new Set(A.rules.map(key));let n=0,sk=0;
+  for(const y of rs){const v=norm(y);if(!v)continue;if(have.has(key(v))){sk++;continue}have.add(key(v));
+    const r={id:(Date.now()+n)%1e8,on:!y||y.on!==false,...v};A.rules.push(r);sched(r);n++}
+  saveA();renderA();toast(n+' aturan diimpor'+(sk?', '+sk+' sama dilewati':'')+'.')}
+$('#aExp').onclick=async()=>{try{await cbw(bkJson());toast('Cadangan disalin.')}catch(e){toast('Gagal menyalin.')}};
+$('#aExpF').onclick=async()=>{const txt=bkJson(),fn='jarvis-aturan-'+new Date().toISOString().slice(0,10)+'.json';
+  try{if(SH){await SH.share({title:fn,text:txt,dialogTitle:'Simpan cadangan aturan'});return}
+    const u=URL.createObjectURL(new Blob([txt],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download=fn;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Menyimpan '+fn)}
+  catch(e){toast('Gagal: '+(e&&e.message||e))}};
+$('#aImp').onclick=async()=>{try{bkImport(JSON.parse(await cbr()))}catch(e){toast('Clipboard tidak berisi aturan yang valid.')}};
+$('#aImpF').onclick=()=>$('#aFile').click();
+$('#aFile').onchange=async e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  try{bkImport(JSON.parse(await f.text()))}catch(x){toast('File bukan cadangan aturan yang valid.')}};
 let lok=null;
 function cv(){$('#rCV').hidden=!['bl','bg'].includes($('#aCond').value)}
 function lokc(){$('#aLokC').textContent=lok?'Tempat tersimpan: '+lok.lat.toFixed(4)+', '+lok.lng.toFixed(4):'Belum ada tempat. Berdirilah di tempatnya, lalu ketuk tombol di atas.'}
