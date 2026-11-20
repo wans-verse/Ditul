@@ -102,6 +102,12 @@ jobs:
               <uses-permission android:name="android.permission.WAKE_LOCK"/>
               <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+              <uses-permission android:name="android.permission.VIBRATE"/>
+              <uses-permission android:name="com.android.alarm.permission.SET_ALARM"/>
+              <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+              <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.READ_CONTACTS"/>
               <queries>
                   <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
                   <intent><action android:name="android.speech.RecognitionService"/></intent>
@@ -114,6 +120,9 @@ jobs:
                       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="otomasi latar belakang"/>
                   </service>
                   <activity android:name=".VoiceActivity" android:theme="@style/VoiceTheme" android:taskAffinity="" android:excludeFromRecents="true" android:exported="false" android:launchMode="singleTask" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"/>
+                  <service android:name=".JarvisNotifService" android:label="Jarvis" android:exported="true" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+                      <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
+                  </service>
                   <receiver android:name=".VoiceWidget" android:label="Jarvis Suara" android:exported="false">
                       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
                       <meta-data android:name="android.appwidget.provider" android:resource="@xml/voice_widget_info"/>
@@ -281,9 +290,82 @@ jobs:
 
           public class KeepAliveService extends Service {
             private PowerManager.WakeLock wl;
+            private android.content.BroadcastReceiver rx;
+            private android.net.ConnectivityManager.NetworkCallback nc;
+            private android.media.AudioDeviceCallback adc;
+            private long t0 = 0;
+            private int hs = 0;
 
             @Override
             public IBinder onBind(Intent i) { return null; }
+
+            private static boolean isHs(android.media.AudioDeviceInfo d) {
+              if (d == null || !d.isSink()) return false;
+              int t = d.getType();
+              return t == android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET
+                || t == android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+                || t == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+                || t == android.media.AudioDeviceInfo.TYPE_USB_HEADSET
+                || (Build.VERSION.SDK_INT >= 31 && t == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET);
+            }
+
+            @Override
+            public void onCreate() {
+              super.onCreate();
+              t0 = System.currentTimeMillis();
+              try {
+                rx = new android.content.BroadcastReceiver() {
+                  @Override
+                  public void onReceive(android.content.Context c, Intent i) {
+                    String a = i.getAction();
+                    if (Intent.ACTION_SCREEN_ON.equals(a)) KeepAlivePlugin.emit("layar_on", "", "", "");
+                    else if (Intent.ACTION_SCREEN_OFF.equals(a)) KeepAlivePlugin.emit("layar_off", "", "", "");
+                  }
+                };
+                android.content.IntentFilter f = new android.content.IntentFilter();
+                f.addAction(Intent.ACTION_SCREEN_ON);
+                f.addAction(Intent.ACTION_SCREEN_OFF);
+                if (Build.VERSION.SDK_INT >= 33) registerReceiver(rx, f, android.content.Context.RECEIVER_NOT_EXPORTED);
+                else registerReceiver(rx, f);
+              } catch (Exception e) {}
+              try {
+                android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+                nc = new android.net.ConnectivityManager.NetworkCallback() {
+                  @Override
+                  public void onAvailable(android.net.Network n) {
+                    if (System.currentTimeMillis() - t0 > 3000) KeepAlivePlugin.emit("wifi_on", "", "", "");
+                  }
+                  @Override
+                  public void onLost(android.net.Network n) {
+                    if (System.currentTimeMillis() - t0 > 3000) KeepAlivePlugin.emit("wifi_off", "", "", "");
+                  }
+                };
+                cm.registerNetworkCallback(new android.net.NetworkRequest.Builder().addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).build(), nc);
+              } catch (Exception e) {}
+              try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                adc = new android.media.AudioDeviceCallback() {
+                  @Override
+                  public void onAudioDevicesAdded(android.media.AudioDeviceInfo[] ds) {
+                    int n = 0;
+                    for (android.media.AudioDeviceInfo d : ds) if (isHs(d)) n++;
+                    if (n == 0) return;
+                    boolean was = hs > 0;
+                    hs += n;
+                    if (!was && System.currentTimeMillis() - t0 > 3000) KeepAlivePlugin.emit("headset_on", "", "", "");
+                  }
+                  @Override
+                  public void onAudioDevicesRemoved(android.media.AudioDeviceInfo[] ds) {
+                    int n = 0;
+                    for (android.media.AudioDeviceInfo d : ds) if (isHs(d)) n++;
+                    if (n == 0) return;
+                    hs = Math.max(0, hs - n);
+                    if (hs == 0) KeepAlivePlugin.emit("headset_off", "", "", "");
+                  }
+                };
+                am.registerAudioDeviceCallback(adc, new android.os.Handler(android.os.Looper.getMainLooper()));
+              } catch (Exception e) {}
+            }
 
             @Override
             public int onStartCommand(Intent intent, int flags, int startId) {
@@ -322,6 +404,9 @@ jobs:
             @Override
             public void onDestroy() {
               if (wl != null && wl.isHeld()) wl.release();
+              try { if (rx != null) unregisterReceiver(rx); } catch (Exception e) {}
+              try { if (nc != null) ((android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE)).unregisterNetworkCallback(nc); } catch (Exception e) {}
+              try { if (adc != null) ((android.media.AudioManager) getSystemService(AUDIO_SERVICE)).unregisterAudioDeviceCallback(adc); } catch (Exception e) {}
               super.onDestroy();
             }
           }
@@ -331,6 +416,11 @@ jobs:
 
           import android.content.Intent;
           import android.app.AlarmManager;
+          import android.app.NotificationManager;
+          import android.os.Vibrator;
+          import android.os.VibrationEffect;
+          import android.provider.AlarmClock;
+          import android.view.KeyEvent;
           import android.hardware.camera2.CameraCharacteristics;
           import android.hardware.camera2.CameraManager;
           import android.media.AudioManager;
@@ -349,8 +439,13 @@ jobs:
           import com.getcapacitor.PluginCall;
           import com.getcapacitor.PluginMethod;
           import com.getcapacitor.annotation.CapacitorPlugin;
+          import com.getcapacitor.annotation.Permission;
+          import com.getcapacitor.annotation.PermissionCallback;
+          import com.getcapacitor.PermissionState;
 
-          @CapacitorPlugin(name = "KeepAlive")
+          @CapacitorPlugin(name = "KeepAlive", permissions = {
+            @Permission(strings = { android.Manifest.permission.READ_CONTACTS }, alias = "kontak")
+          })
           public class KeepAlivePlugin extends Plugin {
             @PluginMethod
             public void start(PluginCall call) {
@@ -423,6 +518,9 @@ jobs:
             o.put("overlay", Settings.canDrawOverlays(c));
             o.put("exact", ex);
             o.put("bgloc", Build.VERSION.SDK_INT < 29 || c.checkSelfPermission("android.permission.ACCESS_BACKGROUND_LOCATION") == PackageManager.PERMISSION_GRANTED);
+            o.put("dnd", ((NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).isNotificationPolicyAccessGranted());
+            o.put("write", Settings.System.canWrite(c));
+            o.put("notif", notifOk(c));
             call.resolve(o);
           }
 
@@ -508,9 +606,249 @@ jobs:
             }
           }
 
+          static final java.util.ArrayList<KeepAlivePlugin> insts = new java.util.ArrayList<>();
+
+          @Override
+          public void load() {
+            synchronized (insts) { insts.add(this); }
+          }
+
+          @Override
+          protected void handleOnDestroy() {
+            synchronized (insts) { insts.remove(this); }
+          }
+
+          static void emit(String type, String a, String b, String c) {
+            synchronized (insts) {
+              for (KeepAlivePlugin p : new java.util.ArrayList<>(insts)) {
+                try {
+                  JSObject o = new JSObject();
+                  o.put("type", type);
+                  o.put("a", a == null ? "" : a);
+                  o.put("b", b == null ? "" : b);
+                  o.put("c", c == null ? "" : c);
+                  p.notifyListeners("event", o);
+                } catch (Exception e) {}
+              }
+            }
+          }
+
+          static boolean notifOk(Context c) {
+            String s = Settings.Secure.getString(c.getContentResolver(), "enabled_notification_listeners");
+            return s != null && s.contains(c.getPackageName());
+          }
+
+          @PluginMethod
+          public void vibrate(PluginCall call) {
+            try {
+              int ms = Math.max(50, Math.min(5000, call.getInt("ms", 400)));
+              Vibrator v;
+              if (Build.VERSION.SDK_INT >= 31) {
+                android.os.VibratorManager vm = (android.os.VibratorManager) getContext().getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+                v = vm.getDefaultVibrator();
+              } else {
+                v = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+              }
+              if (v == null || !v.hasVibrator()) { call.reject("HP ini tidak punya getar"); return; }
+              if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+              else v.vibrate(ms);
+              call.resolve();
+            } catch (Exception e) {
+              call.reject("Getar gagal: " + e.getMessage());
+            }
+          }
+
+          @PluginMethod
+          public void alarm(PluginCall call) {
+            try {
+              Intent i = new Intent(AlarmClock.ACTION_SET_ALARM);
+              int jam = call.getInt("jam", 7);
+              int menit = call.getInt("menit", 0);
+              i.putExtra(AlarmClock.EXTRA_HOUR, jam);
+              i.putExtra(AlarmClock.EXTRA_MINUTES, menit);
+              i.putExtra(AlarmClock.EXTRA_MESSAGE, call.getString("pesan", "Jarvis"));
+              i.putExtra(AlarmClock.EXTRA_SKIP_UI, true);
+              JSArray hr = call.getArray("hari");
+              if (hr != null && hr.length() > 0) {
+                java.util.ArrayList<Integer> d = new java.util.ArrayList<>();
+                for (int k = 0; k < hr.length(); k++) d.add(hr.getInt(k));
+                i.putExtra(AlarmClock.EXTRA_DAYS, d);
+              }
+              go(i);
+              call.resolve();
+            } catch (Exception e) {
+              call.reject("Alarm gagal: " + e.getMessage());
+            }
+          }
+
+          @PluginMethod
+          public void dnd(PluginCall call) {
+            try {
+              NotificationManager nm = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+              if (!nm.isNotificationPolicyAccessGranted()) {
+                go(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS));
+                call.reject("Izinkan akses Jangan Ganggu untuk Jarvis di pengaturan yang baru terbuka, lalu ulangi.");
+                return;
+              }
+              String mode = call.getString("mode", "toggle");
+              int cur = nm.getCurrentInterruptionFilter();
+              boolean isOn = cur != NotificationManager.INTERRUPTION_FILTER_ALL && cur != NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+              int f;
+              if ("off".equals(mode)) f = NotificationManager.INTERRUPTION_FILTER_ALL;
+              else if ("alarm".equals(mode)) f = NotificationManager.INTERRUPTION_FILTER_ALARMS;
+              else if ("total".equals(mode)) f = NotificationManager.INTERRUPTION_FILTER_NONE;
+              else if ("on".equals(mode)) f = NotificationManager.INTERRUPTION_FILTER_PRIORITY;
+              else f = isOn ? NotificationManager.INTERRUPTION_FILTER_ALL : NotificationManager.INTERRUPTION_FILTER_PRIORITY;
+              nm.setInterruptionFilter(f);
+              JSObject o = new JSObject();
+              o.put("on", f != NotificationManager.INTERRUPTION_FILTER_ALL);
+              call.resolve(o);
+            } catch (Exception e) {
+              call.reject("Mode senyap gagal: " + e.getMessage());
+            }
+          }
+
+          @PluginMethod
+          public void brightness(PluginCall call) {
+            try {
+              Context c = getContext();
+              if (!Settings.System.canWrite(c)) {
+                go(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + c.getPackageName())));
+                call.reject("Izinkan 'Ubah setelan sistem' untuk Jarvis di pengaturan yang baru terbuka, lalu ulangi.");
+                return;
+              }
+              android.content.ContentResolver cr = c.getContentResolver();
+              JSObject o = new JSObject();
+              if ("auto".equals(call.getString("mode"))) {
+                Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC);
+                o.put("auto", true);
+                call.resolve(o);
+                return;
+              }
+              Integer p = call.getInt("persen");
+              Integer d = call.getInt("ubah");
+              int cur = Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS, 128);
+              int curP = Math.round(cur * 100f / 255f);
+              int target = p != null ? p : (d != null ? curP + d : curP);
+              target = Math.max(1, Math.min(100, target));
+              Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
+              Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, Math.max(1, Math.round(target * 255f / 100f)));
+              o.put("persen", target);
+              call.resolve(o);
+            } catch (Exception e) {
+              call.reject("Kecerahan gagal: " + e.getMessage());
+            }
+          }
+
+          @PluginMethod
+          public void media(PluginCall call) {
+            try {
+              String a = call.getString("aksi", "toggle");
+              int code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
+              if ("play".equals(a)) code = KeyEvent.KEYCODE_MEDIA_PLAY;
+              else if ("pause".equals(a)) code = KeyEvent.KEYCODE_MEDIA_PAUSE;
+              else if ("next".equals(a)) code = KeyEvent.KEYCODE_MEDIA_NEXT;
+              else if ("prev".equals(a)) code = KeyEvent.KEYCODE_MEDIA_PREVIOUS;
+              else if ("stop".equals(a)) code = KeyEvent.KEYCODE_MEDIA_STOP;
+              AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+              long t = android.os.SystemClock.uptimeMillis();
+              am.dispatchMediaKeyEvent(new KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0));
+              am.dispatchMediaKeyEvent(new KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0));
+              call.resolve();
+            } catch (Exception e) {
+              call.reject("Kontrol media gagal: " + e.getMessage());
+            }
+          }
+
+          @PluginMethod
+          public void notifAccess(PluginCall call) {
+            boolean ok = notifOk(getContext());
+            if (!ok && Boolean.TRUE.equals(call.getBoolean("buka", false))) {
+              go(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+            }
+            JSObject o = new JSObject();
+            o.put("on", ok);
+            call.resolve(o);
+          }
+
+          @PluginMethod
+          public void kontak(PluginCall call) {
+            if (getPermissionState("kontak") != PermissionState.GRANTED) {
+              requestPermissionForAlias("kontak", call, "kontakCb");
+              return;
+            }
+            cariKontak(call);
+          }
+
+          @PermissionCallback
+          private void kontakCb(PluginCall call) {
+            if (getPermissionState("kontak") == PermissionState.GRANTED) cariKontak(call);
+            else call.reject("Izin kontak ditolak. Izinkan di pengaturan aplikasi Jarvis.");
+          }
+
+          private void cariKontak(PluginCall call) {
+            android.database.Cursor cur = null;
+            try {
+              String q = call.getString("nama", "").trim();
+              if (q.isEmpty()) { call.reject("Isi nama kontak"); return; }
+              cur = getContext().getContentResolver().query(
+                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                new String[] {
+                  android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                  android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER
+                },
+                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " LIKE ?",
+                new String[] { "%" + q + "%" },
+                android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC");
+              JSArray arr = new JSArray();
+              java.util.HashSet<String> seen = new java.util.HashSet<>();
+              while (cur != null && cur.moveToNext() && arr.length() < 8) {
+                String n = cur.getString(0);
+                String v = cur.getString(1);
+                if (v == null) continue;
+                String key = n + "|" + v.replaceAll("[^0-9+]", "");
+                if (!seen.add(key)) continue;
+                JSObject o = new JSObject();
+                o.put("n", n);
+                o.put("v", v);
+                arr.put(o);
+              }
+              JSObject res = new JSObject();
+              res.put("kontak", arr);
+              call.resolve(res);
+            } catch (Exception e) {
+              call.reject("Kontak gagal: " + e.getMessage());
+            } finally {
+              if (cur != null) cur.close();
+            }
+          }
+
           private void go(Intent i) {
               i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
               getContext().startActivity(i);
+            }
+          }
+          EOF
+
+          cat > $D/JarvisNotifService.java <<'EOF'
+          package com.jarvis.agent;
+
+          import android.app.Notification;
+          import android.service.notification.NotificationListenerService;
+          import android.service.notification.StatusBarNotification;
+
+          public class JarvisNotifService extends NotificationListenerService {
+            @Override
+            public void onNotificationPosted(StatusBarNotification sbn) {
+              try {
+                if (sbn == null || getPackageName().equals(sbn.getPackageName())) return;
+                Notification n = sbn.getNotification();
+                if (n == null || sbn.isOngoing()) return;
+                if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
+                CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
+                CharSequence x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
+                KeepAlivePlugin.emit("notif", sbn.getPackageName(), t == null ? "" : t.toString(), x == null ? "" : x.toString());
+              } catch (Exception e) {}
             }
           }
           EOF
