@@ -753,12 +753,12 @@ function localMatch(text,canAI){
   if(ru)return async()=>{run(ru).catch(()=>{});return{r:'Menjalankan otomasi '+ru.name+'.',quiet:true}};
 
   /* 1. bantuan */
-  if(/\b(bantuan|help|bisa apa|perintah offline|apa saja perintah|fitur apa)\b/.test(t))return say(HELP);
+  if(/\b(bantuan\w*|help|bisa apa|perintah offline|apa saja perintah|fitur apa)\b/.test(t))return say(HELP);
 
   /* 2. waktu dan tanggal */
-  if(/\b(jam berapa|pukul berapa|sekarang jam|sekarang pukul|waktu sekarang|jam sekarang)\b/.test(t)&&!/\b(ingatkan|alarm|timer)\b/.test(t))
+  if((/\b(jam berapa|pukul berapa|sekarang jam|sekarang pukul|waktu sekarang|jam sekarang|cek jam|lihat jam|cek waktu|lihat waktu)\b/.test(t)||/^(?:tolong )?(?:jam|waktu|pukul)(?: berapa| sekarang)?$/.test(t))&&!/\b(ingatkan|alarm|timer)\b/.test(t))
     return say(()=>{const d=new Date();return 'Sekarang pukul '+pad2(d.getHours())+'.'+pad2(d.getMinutes())+'.'});
-  if(/\b(tanggal berapa|hari apa|tanggal sekarang|tanggal hari ini|hari ini tanggal)\b/.test(t))
+  if(/\b(tanggal berapa|hari apa|tanggal sekarang|tanggal hari ini|hari ini tanggal|cek tanggal|lihat tanggal|cek hari)\b/.test(t)||/^(?:tolong )?(?:tanggal|hari ini|hari)$/.test(t))
     return say(()=>'Hari ini '+new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'.');
 
   /* 3. kendali otomasi */
@@ -885,6 +885,8 @@ function localMatch(text,canAI){
     return async()=>{const [out,err]=await runTool('baca_clipboard');return err?out:'Isi clipboard: '+(out.length>200?out.slice(0,200)+'…':out)};
   m=/^\s*(?:tolong\s+)?(?:salin|copy)\s+(?:teks\s+)?(.+)$/i.exec(raw);
   if(m)return async()=>{const [out,err]=await runTool('salin_teks',{teks:m[1].trim()});return err?out:'Sudah kusalin.'};
+
+  if(/^(?:tolong )?(?:hitung|hitungkan|kalkulator|kalkulasi)(?: dong| ya)?$/.test(t))return say('Mau hitung apa? Contoh: “lima kali dua belas” atau “15 persen dari 200”.');
 
   /* 11. hitung */
   {
