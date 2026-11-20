@@ -682,6 +682,21 @@ jobs:
           }
 
           @PluginMethod
+          public void alarmHapus(PluginCall call) {
+            try {
+              Intent i = new Intent(AlarmClock.ACTION_DISMISS_ALARM);
+              i.putExtra(AlarmClock.EXTRA_ALARM_SEARCH_MODE, AlarmClock.ALARM_SEARCH_MODE_TIME);
+              i.putExtra(AlarmClock.EXTRA_HOUR, call.getInt("jam", 7));
+              i.putExtra(AlarmClock.EXTRA_MINUTES, call.getInt("menit", 0));
+              i.putExtra(AlarmClock.EXTRA_MESSAGE, call.getString("pesan", "Jarvis"));
+              go(i);
+              call.resolve();
+            } catch (Exception e) {
+              call.reject("Hapus alarm gagal: " + e.getMessage());
+            }
+          }
+
+          @PluginMethod
           public void dnd(PluginCall call) {
             try {
               NotificationManager nm = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
@@ -966,6 +981,63 @@ jobs:
             }
           }
           EOF
+
+      - name: Auto-start setelah HP restart
+        run: |
+          D=android/app/src/main/java/com/jarvis/agent
+          cat > $D/BootReceiver.java <<'EOF2'
+          package com.jarvis.agent;
+
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.os.Build;
+          import android.provider.Settings;
+
+          public class BootReceiver extends BroadcastReceiver {
+            @Override
+            public void onReceive(Context c, Intent i) {
+              String a = i == null ? null : i.getAction();
+              if (!Intent.ACTION_BOOT_COMPLETED.equals(a)
+                  && !"android.intent.action.QUICKBOOT_POWERON".equals(a)
+                  && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)) return;
+              try {
+                Intent s = new Intent(c, KeepAliveService.class);
+                if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s); else c.startService(s);
+              } catch (Exception e) {}
+              try {
+                if (Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(c)) {
+                  Intent m = new Intent(c, MainActivity.class);
+                  m.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                  m.putExtra("boot", true);
+                  c.startActivity(m);
+                }
+              } catch (Exception e) {}
+            }
+          }
+          EOF2
+          python3 - <<'PY'
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'BootReceiver' not in s:
+              s = s.replace('</manifest>', '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n</manifest>')
+              s = s.replace('</application>', '''    <receiver android:name=".BootReceiver" android:exported="true">
+                  <intent-filter>
+                      <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                      <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                      <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                  </intent-filter>
+              </receiver>
+          </application>''')
+              open(p, 'w', encoding='utf-8').write(s)
+          m = 'android/app/src/main/java/com/jarvis/agent/MainActivity.java'
+          t = open(m, encoding='utf-8').read()
+          a = 'private void check(Intent i, boolean warm) {'
+          assert a in t
+          if '"boot"' not in t:
+              t = t.replace(a, a + '\n    if (i != null && i.getBooleanExtra("boot", false)) { i.removeExtra("boot"); moveTaskToBack(true); }')
+              open(m, 'w', encoding='utf-8').write(t)
+          PY
 
       - name: Sinkronkan dan bangun APK
         run: |
